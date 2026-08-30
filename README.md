@@ -4,7 +4,7 @@ K12 康奈尔 AI 智能笔记一体化解决方案，支持 **Trae IDE CN / Trae
 
 设计理念：康奈尔笔记法的**线索栏（Cue Column）天然就是复习卡的正面**——「整理笔记」与「生成复习卡」是同一动作，无需两套实体流程（RemNote 模式，笔记即学习材料闭环）。
 
-项目以 **Agent Plugins 1.0**（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）规范打包：`mindweave.plugin/` 即为插件根，含 `plugin.json`（manifest）、`mcp.json`（MCP 启动配置）与 `skills/`（4 个 Skill），可作为标准 Agent Plugin 分发到任意兼容客户端；各 harness 原生目录（`.trae/` 等）仍由 `scripts/sync-agent-configs` 单向生成，互不冲突。
+项目以 **Agent Plugins 1.0**（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）规范打包：`mindweave.plugin/` 即为插件根，含 `plugin.json`（manifest）、`mcp.json`（MCP 启动配置）与 `skills/`（5 个 Skill），可作为标准 Agent Plugin 分发到任意兼容客户端；各 harness 原生目录（`.trae/` 等）仍由 `scripts/sync-agent-configs` 单向生成，互不冲突。
 
 ## 核心功能
 
@@ -13,6 +13,8 @@ K12 康奈尔 AI 智能笔记一体化解决方案，支持 **Trae IDE CN / Trae
 - 🧠 **智能存储**: 笔记本地保存，cue 内嵌 SM-2 记忆状态（reps / EF / interval / next_review）
 - 📅 **复习排程**: SM-2 遗忘曲线算法，到期 cue 队列（每日上限 10 卡）
 - ✅ **遮挡回忆自评**: 线索问题 → 用户回忆 → 揭示答案 → 自评 1-4，自动更新 SM-2 参数
+- 🎯 **AI 出题测验**（`/quiz`）: 从知识卡生成选择/填空题 → 用户作答 → 判分（出题即复习，与自评等价推动 SM-2）
+- 🖥️ **Web 可视化**（`mindweave-web`）: 本地人工处理面——概览 / 笔记浏览+编辑+删除（修正 LLM 整理结果）/ 自评复习 / 统计（ECharts），默认 127.0.0.1:8003
 - 📊 **统计分析**: 按学科/知识点/日期/掌握度四维度聚合
 - 📤 **数据导出**: JSON / Markdown 格式导出笔记
 
@@ -23,14 +25,16 @@ K12 康奈尔 AI 智能笔记一体化解决方案，支持 **Trae IDE CN / Trae
 ├── 对话式交互 (命令 / 自然语言)
 ├── 四运行时: Trae + CodeBuddy + OpenCode（goose 保留未默认支持）
     ↓
-Skills 编排层 (mindweave.plugin/skills/mindweave-*: capture / review / stats / export)
+Skills 编排层 (mindweave.plugin/skills/mindweave-*: capture / review / quiz / stats / export)
     ↓
 MCP Tools 层 (mindweave.plugin/mindweave-mcp)
 ├── organize → save/get/query/update/delete → schedule/submit → statistics → export
+├── + quiz 工具链: generate_quiz → save_quiz → grade_quiz（仅对话链路）
+├── Web 层 (mindweave_mcp/web): FastAPI + Jinja2 + HTMX + ECharts（本地人工处理面，无出题路由）
     ↓
 Rules 约束层 (mindweave.plugin/AGENTS.md — 统一规则源)
     ↓
-数据存储层 (本地 JSON 文件，原子写入: data/notes/ reviews/ exports/ images/)
+数据存储层 (本地 JSON 文件，原子写入: data/notes/ reviews/ exports/ images/ quizzes/)
 ```
 
 ## 技术栈
@@ -82,12 +86,22 @@ bash scripts/sync-agent-configs.sh
 
 ```
 /capture  - 录入笔记（拍照/文字 → 康奈尔整理）
-/review   - 复习到期知识卡（SM-2 排程）
+/review   - 复习到期知识卡（SM-2 排程·自评）
+/quiz     - 出题测验（选择/填空，出题即复习）
 /stats    - 查看笔记统计
 /export   - 导出笔记数据
 ```
 
-自然语言：录笔记 / 该复习了 / 笔记统计 / 导出笔记 亦可触发。
+自然语言：录笔记 / 该复习了 / 考我 / 笔记统计 / 导出笔记 亦可触发。
+
+### Web 可视化（可选）
+
+```bash
+cd mindweave.plugin/mindweave-mcp && uv run mindweave-web
+# 浏览器打开 http://127.0.0.1:8003（本机绑定；可用 MINDWEAVE_WEB_HOST/PORT 覆盖）
+```
+
+提供概览 / 笔记列表+详情 / 笔记人工处理（编辑+删除，修正 LLM 整理结果）/ 自评复习 / 统计五个页面。
 
 ## 项目结构
 
@@ -103,12 +117,12 @@ MindWeave/
 │   ├── tools.json / triggers.json / workflows.json   # AAIF 声明（脚本生成，勿手改）
 │   ├── .codebuddy-plugin/plugin.json     # CodeBuddy CLI 插件身份
 │   ├── runtime/{trae,codebuddy,opencode,goose}.json  # 各平台 MCP 运行时配置源
-│   ├── skills/                           # 4 个 Skill（同步到 .trae/.opencode/.codebuddy）
+│   ├── skills/                           # 5 个 Skill（同步到 .trae/.opencode/.codebuddy）
 │   └── mindweave-mcp/                    # MCP Server 服务层（Python，内联自包含）
-│       ├── src/mindweave_mcp/            # server.py / models.py / algorithms.py / storage.py / prompts/ / tools/
+│       ├── src/mindweave_mcp/            # server.py / models.py / algorithms.py / storage.py / prompts/ / tools/ / web/
 │       ├── tests/                        # 测试套件
 │       ├── data/                         # 运行时数据（被 .gitignore，保留 .gitkeep）
-│       └── pyproject.toml                # 入口 mindweave-mcp
+│       └── pyproject.toml                # 入口 mindweave-mcp / mindweave-web
 ├── .trae/ .opencode/ .codebuddy/         # 各平台配置（scripts/sync-agent-configs 生成）
 └── docs/                                 # 设计文档 / 计划 / 评审（本地文档，不入库追踪）
 ```
@@ -127,7 +141,7 @@ MindWeave/
 
 ## Sage 集成
 
-MindWeave 是 Sage 学习三支柱中的第三域（课堂/知识点笔记）。Sage 侧通过 `MindWeaveReader` 只读聚合 `data/notes/*.json`（cues 展平为 due items，due 来源 `cue.review_state.next_review`），`sync_from_plugins` 后可在 `get_profile` 出现 mindweave 域；`.trae/skills/` 投影使 TraeCode `list skills` 可见三插件共 14 技能。
+MindWeave 是 Sage 学习三支柱中的第三域（课堂/知识点笔记）。Sage 侧通过 `MindWeaveReader` 只读聚合 `data/notes/*.json`（cues 展平为 due items，due 来源 `cue.review_state.next_review`），`sync_from_plugins` 后可在 `get_profile` 出现 mindweave 域；`.trae/skills/` 投影使 TraeCode `list skills` 可见三插件共 15 技能（deep-review 5 + vocabcraft 5 + mindweave 5）。
 
 ## 数据安全
 

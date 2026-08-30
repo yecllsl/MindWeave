@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-08-30
+
+### 新增
+- **AI 出题测验（对话链路）**：`generate_quiz` / `save_quiz` / `grade_quiz` 三工具，选择/填空题型；出题即复习（判分与自评共享 `apply_review` SM-2 更新路径，ReviewRecord 新增 `source` 字段区分 self/quiz 口径）。
+- **`mindweave-quiz` skill**（`/quiz` 命令，触发词：出题/考我/练一练/测验）。
+- **Web 可视化人工处理面**（`mindweave-web`，FastAPI + Jinja2 + HTMX/Alpine + ECharts）：概览 / 笔记列表+详情 / 笔记编辑+删除（修正 LLM 整理结果，question 变更重置复习状态）/ 自评复习 / 统计五页面；默认本机绑定 127.0.0.1:8003。
+
+### 安全
+- quiz 判分三道硬防御：空作答拒绝、占位题（answer 空）拒绝、已判分 quiz 拒绝二次评分。
+- `save_quiz` 经 `QuizRecord` pydantic 重建校验（选择题 answer ∈ options），禁止宿主直写 quizzes 文件；`data/quizzes/` 不入 Git。
+
 ## [0.1.0] - 2026-08-30
 
 ### 首个版本：K12 康奈尔 AI 智能笔记 Agent Plugin
