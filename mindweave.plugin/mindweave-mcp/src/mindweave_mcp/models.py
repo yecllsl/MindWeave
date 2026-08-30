@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 SUBJECTS = ["语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"]
 
@@ -73,6 +73,8 @@ class ReviewRecord(BaseModel):
     cue_id: str
     review_time: str = Field(description="ISO")
     grade: int = Field(description="1-4")
+    # "self" 自评 / "quiz" 出题判分；带默认值向后兼容 v0.1 已落盘记录（缺字段读默认）
+    source: str = Field(default="self", description='"self" | "quiz"')
 
     @field_validator("grade")
     @classmethod
@@ -80,3 +82,59 @@ class ReviewRecord(BaseModel):
         if not 1 <= v <= 4:
             raise ValueError(f"grade 必须在 1-4 之间，收到: {v}")
         return v
+
+    @field_validator("source")
+    @classmethod
+    def _validate_source(cls, v: str) -> str:
+        if v not in {"self", "quiz"}:
+            raise ValueError(f'source 必须是 "self" 或 "quiz"，收到: {v}')
+        return v
+
+
+VALID_QUIZ_TYPES = {"选择", "填空"}
+
+
+class QuizRecord(BaseModel):
+    """AI 出题测验记录（data/quizzes/{quiz_id}.json）。"""
+    quiz_id: str = Field(description="quiz_YYYYMMDD_NNN")
+    note_id: str
+    cue_id: str
+    quiz_type: str = Field(description='"选择" | "填空"')
+    question: str = Field(description="题干；占位阶段为提示文本")
+    options: list[str] = Field(default_factory=list,
+                               description="选择专用（4 项含正确答案）；填空为空")
+    answer: str = Field(default="", description="正确答案，判分用；占位阶段为空串")
+    created_at: str = Field(description="ISO")
+    answered: bool = False
+    grade: int | None = Field(default=None, description="判分后填 1-4")
+
+    @field_validator("quiz_id")
+    @classmethod
+    def _validate_quiz_id(cls, v: str) -> str:
+        if not v.startswith("quiz_"):
+            raise ValueError(f"quiz_id 须以 'quiz_' 开头，收到: {v}")
+        return v
+
+    @field_validator("quiz_type")
+    @classmethod
+    def _validate_quiz_type(cls, v: str) -> str:
+        if v not in VALID_QUIZ_TYPES:
+            raise ValueError(f"quiz_type 必须是 {VALID_QUIZ_TYPES} 之一，收到: {v}")
+        return v
+
+    @field_validator("grade")
+    @classmethod
+    def _validate_grade(cls, v: int | None) -> int | None:
+        if v is not None and not 1 <= v <= 4:
+            raise ValueError(f"grade 须在 1-4 之间，收到: {v}")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_choice_quiz(self) -> QuizRecord:
+        """选择题完整性：answer 非空时须恰 4 选项且 answer ∈ options（评审 P3-6 定稿）。"""
+        if self.quiz_type == "选择" and self.answer.strip():
+            if len(self.options) != 4:
+                raise ValueError(f"选择题 options 须 4 项，收到 {len(self.options)} 项")
+            if self.answer.strip() not in [o.strip() for o in self.options]:
+                raise ValueError("选择题 answer 必须是 options 之一")
+        return self
