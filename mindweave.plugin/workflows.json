@@ -18,17 +18,36 @@
     {
       "name": "mindweave-export",
       "description": "Use when 用户想导出笔记、备份笔记。NOT for 录入（用 mindweave-capture）、复习（用 mindweave-review）、统计（用 mindweave-stats）",
-      "steps": []
+      "steps": [
+        {
+          "action": "export_data",
+          "description": "调用 export_data：导出 json / markdown 到 data/exports/。"
+        }
+      ]
     },
     {
       "name": "mindweave-review",
       "description": "Use when 用户想复习笔记、该复习了、复习到期知识卡。NOT for 录入新笔记（用 mindweave-capture）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）",
-      "steps": []
+      "steps": [
+        {
+          "action": "schedule_review",
+          "description": "调用 schedule_review：到期 cue 队列（next_review <= 今天，可按学科筛）。"
+        },
+        {
+          "action": "submit_review",
+          "description": "调用 submit_review：cue 自评 1-4 → SM-2 更新（<3 重置周期）+ 写 ReviewRecord。"
+        }
+      ]
     },
     {
       "name": "mindweave-stats",
       "description": "Use when 用户想看笔记统计、知识点分布、掌握度分布。NOT for 录入（用 mindweave-capture）、复习（用 mindweave-review）、导出（用 mindweave-export）",
-      "steps": []
+      "steps": [
+        {
+          "action": "get_statistics",
+          "description": "调用 get_statistics：聚合统计（subject/knowledge_point/date/mastery）。"
+        }
+      ]
     }
   ]
 }

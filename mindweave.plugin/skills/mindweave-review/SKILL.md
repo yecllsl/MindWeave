@@ -14,7 +14,7 @@ description: Use when 用户想复习笔记、该复习了、复习到期知识�
 ## Workflow
 
 ### 1. 取到期队列
-调用 `schedule_review()`（可选 `subject` 过滤）。每日上限 10 卡。
+调用 `schedule_review`（可选 `subject` 过滤）。每日上限 10 卡。
 
 ### 2. 逐卡复习
 对每张到期卡：
@@ -23,7 +23,7 @@ description: Use when 用户想复习笔记、该复习了、复习到期知识�
 3. 用户自评 1-4（4 轻松想起 / 3 勉强想起 / 2 模糊 / 1 想不起）
 
 ### 3. 提交评分
-调用 `submit_review(cue_id=..., grade=...)`。
+调用 `submit_review`（传 `cue_id` 与用户自评 `grade` 1-4）。
 
 ### 4. 汇总
 输出：复习卡数、grade 分布、grade<3 薄弱卡清单、下次复习日期分布。
