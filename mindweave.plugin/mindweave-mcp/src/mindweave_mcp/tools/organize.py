@@ -28,9 +28,11 @@ def organize_note(image_path: str = "", text: str = "", subject: str = "") -> di
     # 模式 2：本地路径多模态
     if image_path and image_path.strip():
         resolved = Path(image_path).resolve()
-        if not resolved.is_relative_to(_data_dir().resolve()):
+        # 仅允许读取 data/images/ 内的图片（spec §7 采集规则 #5），
+        # 避免宿主 LLM 以 image_path 指向 notes/reviews 等本地学习数据（prompt 注入放大面）
+        if not resolved.is_relative_to((_data_dir() / "images").resolve()):
             return {"structured_note": None, "mode": "multimodal", "image_path": image_path,
-                    "error": f"路径越界: {image_path}，仅允许读取 data/ 目录内的图片"}
+                    "error": f"路径越界: {image_path}，仅允许读取 data/images/ 目录内的图片"}
         return {
             "structured_note": None, "mode": "multimodal", "parse_prompt": render_multimodal_prompt(),
             "image_path": image_path, "subject": subject,

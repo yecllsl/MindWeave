@@ -42,6 +42,7 @@ def _init_cues(note_id: str, raw_cues: list[dict[str, Any]]) -> list[Cue]:
 
 
 def save_note(note_data: dict[str, Any]) -> dict[str, Any]:
+    """保存笔记：pydantic 校验 + cue 初始化 SM-2 状态；非法输入返回 {error}。"""
     storage = get_storage()
     subject = note_data.get("subject", "")
     cornell_raw = note_data.get("cornell") or {}
@@ -71,11 +72,13 @@ def save_note(note_data: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_note(note_id: str) -> dict[str, Any]:
+    """取单篇笔记（含 cues 复习状态）；不存在返回 {"note": None}。"""
     note = get_storage().load_note(note_id)
     return {"note": note.model_dump() if note else None}
 
 
 def query_notes(filters: dict[str, Any]) -> dict[str, Any]:
+    """按学科/知识点/关键词/日期区间过滤笔记，created_at 倒序。"""
     storage = get_storage()
     notes: list[dict[str, Any]] = []
     for n in storage.get_all_notes():
@@ -105,6 +108,7 @@ def _matches(n: NoteRecord, f: dict[str, Any]) -> bool:
 
 
 def update_note(note_data: dict[str, Any]) -> dict[str, Any]:
+    """全量覆盖更新笔记；question 变更的 cue 重置 review_state，其余保留。"""
     storage = get_storage()
     note_id = note_data.get("note_id")
     if not note_id:
@@ -154,4 +158,7 @@ def update_note(note_data: dict[str, Any]) -> dict[str, Any]:
 
 
 def delete_note(note_id: str) -> dict[str, Any]:
+    """删除笔记文件；历史 ReviewRecord 保留为孤儿记录（见 ponytail 注释）。"""
+    # ponytail: 删除笔记不级联清理 reviews/*.json —— 孤儿记录保留历史，统计时被忽略；
+    # 未来如需清理，可加孤儿回收（按 note_id 匹配），本期接受该已知天花板。
     return {"note_id": note_id, "deleted": get_storage().delete_note(note_id)}

@@ -10,6 +10,7 @@ from mindweave_mcp.tools.crud import get_storage
 
 
 def schedule_review(subject: str = "", limit: int = 10) -> dict[str, Any]:
+    """返回到期 cue 队列（next_review <= 今天，可按学科筛）。"""
     storage = get_storage()
     today = _today_utc().isoformat()
     due: list[dict[str, Any]] = []
@@ -28,6 +29,7 @@ def schedule_review(subject: str = "", limit: int = 10) -> dict[str, Any]:
 
 
 def submit_review(cue_id: str, grade: int) -> dict[str, Any]:
+    """cue 自评 1-4 → SM-2 更新（<3 重置周期）+ 写 ReviewRecord。"""
     storage = get_storage()
     for note in storage.get_all_notes():
         for cue in note.cornell.cues:
@@ -44,6 +46,9 @@ def submit_review(cue_id: str, grade: int) -> dict[str, Any]:
                 cue.review_state.repetitions = r["repetitions"]
                 cue.review_state.next_review = r["next_review_date"]
                 storage.update_note(note)
+                # ponytail: note 与 record 为两次独立文件写，进程在两者间崩溃会产生
+                # 「review_state 已推进但 ReviewRecord 缺失」的不一致（Sage recent_activity 漏记）。
+                # 单用户本地场景概率极低，本期接受；升级路径：先写 record 再写 note。
                 # record_id 追加 uuid4 前 8 位：同秒同 cue 重复提交也不碰撞
                 rec = ReviewRecord(
                     record_id=f"review_{_now_utc().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}_{cue_id}",
