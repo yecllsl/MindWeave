@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}概览{% endblock %}
+{% block content %}
+<h2>概览</h2>
+<div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-value">{{ summary.total_notes }}</div><div class="kpi-label">总笔记</div></div>
+    <div class="kpi-card"><div class="kpi-value">{{ summary.total_cues }}</div><div class="kpi-label">总知识卡</div></div>
+    <div class="kpi-card"><div class="kpi-value">{{ summary.due_count }}</div><div class="kpi-label">今日到期</div></div>
+</div>
+<div class="chart-grid">
+    <div class="chart-card">
+        <h3>学科分布</h3>
+        <div data-echart="renderSubjectPie" data-chart-url="/api/dashboard/summary"
+             style="height:300px"></div>
+    </div>
+    <div class="chart-card">
+        <h3>近 7 天复习趋势</h3>
+        <div data-echart="renderTrendBar" data-chart-url="/api/dashboard/summary"
+             style="height:300px"></div>
+    </div>
+</div>
+<script>
+function renderSubjectPie(el, data) {
+    echarts.init(el).setOption({
+        tooltip: {trigger: 'item'},
+        series: [{type: 'pie', data: data.subject_distribution}]
+    });
+}
+function renderTrendBar(el, data) {
+    echarts.init(el).setOption({
+        tooltip: {trigger: 'axis'},
+        xAxis: {type: 'category', data: data.trends.map(t => t.date.slice(5))},
+        yAxis: {type: 'value', minInterval: 1},
+        series: [{type: 'bar', data: data.trends.map(t => t.count)}]
+    });
+}
+</script>
+{% endblock %}
