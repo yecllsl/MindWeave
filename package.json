@@ -1,0 +1,16 @@
+{
+  "name": "mindweave",
+  "version": "0.1.0",
+  "description": "MindWeave - K12 康奈尔 AI 智能笔记智能体",
+  "main": "mindweave.plugin/tools.json",
+  "scripts": {
+    "generate-declarations": "uv run --no-sync --directory mindweave.plugin/mindweave-mcp python ../../scripts/generate-aaif-declarations.py",
+    "sync-configs": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-agent-configs.ps1",
+    "publish": "agents publish mindweave.plugin"
+  },
+  "keywords": ["aaif", "agent", "note", "cornell", "learning", "mcp"],
+  "author": "yecll",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
