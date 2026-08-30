@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MindWeave{% endblock %} - MindWeave</title>
+    <link rel="stylesheet" href="/static/app.css">
+    <script src="/static/htmx.min.js"></script>
+    <script src="/static/alpine.min.js" defer></script>
+    <script src="/static/echarts.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">📓 MindWeave</div>
+        <div class="navbar-tabs">
+            <a class="navbar-tab {% if active == 'dashboard' %}active{% endif %}" href="/">概览</a>
+            <a class="navbar-tab {% if active == 'notes' %}active{% endif %}" href="/notes">笔记</a>
+            <a class="navbar-tab {% if active == 'review' %}active{% endif %}" href="/review">复习</a>
+            <a class="navbar-tab {% if active == 'stats' %}active{% endif %}" href="/stats">统计</a>
+        </div>
+    </nav>
+    <div id="content" class="page-content">
+        {% block content %}{% endblock %}
+    </div>
+    <div id="toast-container"></div>
+    <script>
+        document.body.addEventListener('htmx:responseError', function() {
+            alert('请求失败，请重试');
+        });
+        // ECharts 渲染辅助：容器声明 data-echart=渲染函数名 + data-chart-url=数据源
+        function initECharts(root) {
+            if (!root || !root.querySelectorAll) return;
+            const containers = [];
+            if (root.matches && root.matches('[data-echart]')) containers.push(root);
+            root.querySelectorAll('[data-echart]').forEach(c => containers.push(c));
+            containers.forEach(container => {
+                if (container.hasAttribute('data-echart-ready')) return;
+                const fn = window[container.getAttribute('data-echart')];
+                const dataUrl = container.getAttribute('data-chart-url');
+                if (!fn || !dataUrl) return;
+                container.setAttribute('data-echart-ready', '1');
+                fetch(dataUrl).then(r => r.json()).then(d => fn(container, d))
+                    .catch(() => container.innerHTML = '图表加载失败');
+            });
+        }
+        document.body.addEventListener('htmx:load', function(evt) {
+            initECharts(evt.detail.elt || evt.target);
+        });
+        window.addEventListener('DOMContentLoaded', function() {
+            initECharts(document.body);
+        });
+    </script>
+</body>
+</html>
