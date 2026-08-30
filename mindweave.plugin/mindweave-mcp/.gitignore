@@ -3,11 +3,13 @@ data/notes/*.json
 data/reviews/*.json
 data/images/*
 data/exports/*
+data/quizzes/*.json
 # 保留目录结构
 !data/notes/.gitkeep
 !data/reviews/.gitkeep
 !data/images/.gitkeep
 !data/exports/.gitkeep
+!data/quizzes/.gitkeep
 
 # uv / python
 .venv/

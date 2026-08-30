@@ -1,4 +1,4 @@
-from mindweave_mcp.models import Cornell, Cue, NoteRecord, ReviewRecord
+from mindweave_mcp.models import Cornell, Cue, NoteRecord, QuizRecord, ReviewRecord
 
 
 def _note(note_id="note_20260830_001"):
@@ -34,3 +34,34 @@ def test_delete_note(storage):
 def test_save_review_record_and_list(storage):
     storage.save_review_record(ReviewRecord(record_id="r1", note_id="n1", cue_id="c1", review_time="t", grade=4))
     assert len(storage.list_all_review_records()) == 1
+
+
+# ── v0.2 quizzes CRUD ──
+def _make_quiz(quiz_id="quiz_20260830_001"):
+    return QuizRecord(
+        quiz_id=quiz_id, note_id="note_20260830_001",
+        cue_id="note_20260830_001_c1", quiz_type="选择",
+        question="q", options=["A", "B", "C", "D"], answer="A",
+        created_at="2026-08-30T00:00:00",
+    )
+
+
+def test_storage_creates_quizzes_dir(storage):
+    assert storage.quizzes_dir.exists() and storage.quizzes_dir.is_dir()
+
+
+def test_storage_save_and_load_quiz(storage):
+    r = storage.save_quiz(_make_quiz())
+    assert "error" not in r
+    loaded = storage.load_quiz("quiz_20260830_001")
+    assert loaded is not None and loaded.answer == "A"
+
+
+def test_storage_load_quiz_missing_returns_none(storage):
+    assert storage.load_quiz("quiz_20990101_001") is None
+
+
+def test_storage_list_all_quiz_ids(storage):
+    storage.save_quiz(_make_quiz("quiz_20260830_001"))
+    storage.save_quiz(_make_quiz("quiz_20260830_002"))
+    assert set(storage.list_all_quiz_ids()) == {"quiz_20260830_001", "quiz_20260830_002"}

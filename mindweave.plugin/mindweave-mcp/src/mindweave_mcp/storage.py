@@ -1,4 +1,4 @@
-"""本地 JSON 文件存储引擎（原子写）。目录：notes/ reviews/ exports/ images/。"""
+"""本地 JSON 文件存储引擎（原子写）。目录：notes/ reviews/ exports/ images/ quizzes/。"""
 from __future__ import annotations
 
 import json
@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from mindweave_mcp.models import NoteRecord, ReviewRecord
+from mindweave_mcp.models import NoteRecord, QuizRecord, ReviewRecord
 
 
 class Storage:
@@ -16,7 +16,8 @@ class Storage:
         self.reviews_dir = self.base_dir / "reviews"
         self.exports_dir = self.base_dir / "exports"
         self.images_dir = self.base_dir / "images"
-        for d in [self.notes_dir, self.reviews_dir, self.exports_dir, self.images_dir]:
+        self.quizzes_dir = self.base_dir / "quizzes"
+        for d in [self.notes_dir, self.reviews_dir, self.exports_dir, self.images_dir, self.quizzes_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -54,6 +55,21 @@ class Storage:
 
     def get_all_notes(self) -> list[NoteRecord]:
         return [n for nid in self.list_all_note_ids() if (n := self.load_note(nid))]
+
+    # ── quiz CRUD ──
+    def save_quiz(self, quiz: QuizRecord) -> dict[str, Any]:
+        fp = self.quizzes_dir / f"{quiz.quiz_id}.json"
+        self._atomic_write(fp, quiz.model_dump_json(indent=2, ensure_ascii=False))
+        return {"quiz_id": quiz.quiz_id, "saved_path": str(fp)}
+
+    def load_quiz(self, quiz_id: str) -> QuizRecord | None:
+        fp = self.quizzes_dir / f"{quiz_id}.json"
+        if not fp.exists():
+            return None
+        return QuizRecord.model_validate(json.loads(fp.read_text(encoding="utf-8")))
+
+    def list_all_quiz_ids(self) -> list[str]:
+        return [f.stem for f in self.quizzes_dir.glob("*.json")]
 
     # ── review CRUD ──
     def save_review_record(self, record: ReviewRecord) -> dict[str, Any]:
