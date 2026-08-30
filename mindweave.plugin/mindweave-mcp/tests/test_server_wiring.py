@@ -4,11 +4,12 @@ import asyncio
 from mindweave_mcp import server
 
 
-def test_all_ten_tools_registered():
+def test_all_thirteen_tools_registered():
     names = {t.name for t in asyncio.run(server.mcp.list_tools())}
     expected = {"organize_note", "save_note", "get_note", "query_notes",
                 "update_note", "delete_note", "schedule_review", "submit_review",
-                "get_statistics", "export_data"}
+                "get_statistics", "export_data",
+                "generate_quiz", "save_quiz", "grade_quiz"}
     assert names == expected
 
 
