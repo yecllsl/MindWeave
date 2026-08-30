@@ -28,8 +28,11 @@ def schedule_review(subject: str = "", limit: int = 10) -> dict[str, Any]:
             "returned": len(due[:limit]), "due_cues": due[:limit]}
 
 
-def submit_review(cue_id: str, grade: int) -> dict[str, Any]:
-    """cue 自评 1-4 → SM-2 更新（<3 重置周期）+ 写 ReviewRecord。"""
+def apply_review(cue_id: str, grade: int, source: str = "self") -> dict[str, Any]:
+    """cue 评分 → SM-2 更新 + 写 ReviewRecord（自评与 quiz 判分共用的唯一路径）。
+
+    source: "self"（自评复习）/ "quiz"（出题判分），落盘进 ReviewRecord 供统计区分口径。
+    """
     storage = get_storage()
     for note in storage.get_all_notes():
         for cue in note.cornell.cues:
@@ -53,10 +56,15 @@ def submit_review(cue_id: str, grade: int) -> dict[str, Any]:
                 rec = ReviewRecord(
                     record_id=f"review_{_now_utc().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}_{cue_id}",
                     note_id=note.note_id, cue_id=cue_id,
-                    review_time=_now_utc().isoformat(), grade=grade,
+                    review_time=_now_utc().isoformat(), grade=grade, source=source,
                 )
                 storage.save_review_record(rec)
                 return {"cue_id": cue_id, "grade": grade,
                         "next_review": r["next_review_date"],
                         "repetitions": r["repetitions"], "ease_factor": r["ease_factor"]}
     return {"error": f"cue 不存在: {cue_id}"}
+
+
+def submit_review(cue_id: str, grade: int) -> dict[str, Any]:
+    """cue 自评 1-4 → SM-2 更新（<3 重置周期）+ 写 ReviewRecord(source="self")。"""
+    return apply_review(cue_id, grade, source="self")

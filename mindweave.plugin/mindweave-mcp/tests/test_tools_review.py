@@ -38,6 +38,8 @@ def test_submit_review_writes_review_record(isolated_storage):
     submit_review(cue_id="note_20260830_001_c1", grade=3)
     from mindweave_mcp.tools.crud import get_storage
     assert len(get_storage().list_all_review_records()) == 1
+    rec = get_storage().list_all_review_records()[0]
+    assert rec.source == "self"
 
 def test_submit_invalid_grade_returns_error(isolated_storage):
     _save_due("2020-01-01")
@@ -49,3 +51,14 @@ def test_submit_invalid_grade_returns_error(isolated_storage):
 
 def test_submit_missing_cue_returns_error(isolated_storage):
     assert "error" in submit_review(cue_id="nonexistent_c1", grade=3)
+
+
+def test_apply_review_quiz_source(isolated_storage):
+    """quiz 判分与自评共享 apply_review，source=quiz 落盘。"""
+    from mindweave_mcp.tools.review import apply_review
+    _save_due("2020-01-01")
+    r = apply_review("note_20260830_001_c1", 4, source="quiz")
+    assert "next_review" in r
+    from mindweave_mcp.tools.crud import get_storage
+    rec = get_storage().list_all_review_records()[0]
+    assert rec.source == "quiz"
