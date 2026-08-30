@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}统计{% endblock %}
+{% block content %}
+<h2>统计</h2>
+<div class="filter-bar">
+    {% for value, label in group_options %}
+    <button class="btn" onclick="switchGroup('{{ value }}')">{{ label }}</button>
+    {% endfor %}
+</div>
+<div class="chart-card">
+    <div id="stats-chart" style="height:400px"></div>
+</div>
+<script>
+let statsChart = null;
+function renderStats(groupBy) {
+    fetch('/api/stats?group_by=' + groupBy)
+        .then(r => r.json())
+        .then(data => {
+            statsChart = statsChart || echarts.init(document.getElementById('stats-chart'));
+            statsChart.setOption({
+                tooltip: {trigger: 'axis'},
+                xAxis: {type: 'category', data: data.items.map(i => i.key)},
+                yAxis: {type: 'value', minInterval: 1},
+                series: [{type: 'bar', name: groupBy, data: data.items.map(i => i.count)}]
+            }, true);
+        });
+}
+function switchGroup(groupBy) { renderStats(groupBy); }
+renderStats('subject');
+</script>
+{% endblock %}

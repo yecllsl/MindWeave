@@ -164,3 +164,23 @@ def test_review_submit_invalid_grade(client):
         "cue_id": "note_20260830_001_c1", "grade": "9",
     }, follow_redirects=False)
     assert r.status_code == 422
+
+
+# ── stats ──
+def test_stats_get_200(client):
+    _save_note()
+    r = client.get("/stats")
+    assert r.status_code == 200
+
+
+def test_stats_api_json_structure(client):
+    _save_note()
+    r = client.get("/api/stats", params={"group_by": "subject"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["group_by"] == "subject" and data["total"] == 1
+    assert any(item["key"] == "生物" for item in data["items"])
+
+
+def test_stats_api_invalid_group(client):
+    assert client.get("/api/stats", params={"group_by": "nope"}).status_code == 422
