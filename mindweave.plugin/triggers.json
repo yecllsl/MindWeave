@@ -1,0 +1,53 @@
+{
+  "$schema": "https://agents.aaif.io/schemas/triggers.json",
+  "triggers": [
+    {
+      "type": "command",
+      "pattern": "^/capture(\\s.*)?$",
+      "handler": "handle_command",
+      "description": "mindweave-capture 命令触发器"
+    },
+    {
+      "type": "conversation",
+      "pattern": "(?i)(录笔记|拍照记笔记|记课堂笔记|整理笔记)",
+      "handler": "handle_trigger",
+      "description": "mindweave-capture 对话触发器"
+    },
+    {
+      "type": "command",
+      "pattern": "^/export(\\s.*)?$",
+      "handler": "handle_command",
+      "description": "mindweave-export 命令触发器"
+    },
+    {
+      "type": "conversation",
+      "pattern": "(?i)(导出笔记|备份)",
+      "handler": "handle_trigger",
+      "description": "mindweave-export 对话触发器"
+    },
+    {
+      "type": "command",
+      "pattern": "^/review(\\s.*)?$",
+      "handler": "handle_command",
+      "description": "mindweave-review 命令触发器"
+    },
+    {
+      "type": "conversation",
+      "pattern": "(?i)(复习笔记|该复习了|复习到期的知识卡)",
+      "handler": "handle_trigger",
+      "description": "mindweave-review 对话触发器"
+    },
+    {
+      "type": "command",
+      "pattern": "^/stats(\\s.*)?$",
+      "handler": "handle_command",
+      "description": "mindweave-stats 命令触发器"
+    },
+    {
+      "type": "conversation",
+      "pattern": "(?i)(笔记统计|知识点分布|掌握度)",
+      "handler": "handle_trigger",
+      "description": "mindweave-stats 对话触发器"
+    }
+  ]
+}

@@ -1,0 +1,193 @@
+{
+  "$schema": "https://agents.aaif.io/schemas/tools.json",
+  "name": "mindweave-mcp",
+  "version": "0.1.0",
+  "description": "K12 康奈尔 AI 智能笔记 MCP Server",
+  "tools": [
+    {
+      "name": "organize_note",
+      "description": "返回康奈尔整理 prompt（三模式：对话多模态 > image_path > text），宿主 LLM 填结构。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "image_path": {
+            "default": "",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "type": "string"
+          },
+          "subject": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "name": "save_note",
+      "description": "pydantic 校验 + 保存笔记（cue 初始化 SM-2 状态）。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "note_data": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "note_data"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_note",
+      "description": "取单篇笔记（含 cues 复习状态）。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "note_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "note_id"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "query_notes",
+      "description": "按学科/知识点/日期/关键词过滤。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "filters"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "update_note",
+      "description": "更新笔记（question 变更重置该 cue 的 review_state）。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "note_data": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "note_data"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "delete_note",
+      "description": "删除笔记。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "note_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "note_id"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "schedule_review",
+      "description": "到期 cue 队列（next_review <= 今天，可按学科筛）。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "subject": {
+            "default": "",
+            "type": "string"
+          },
+          "limit": {
+            "default": 10,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "name": "submit_review",
+      "description": "cue 自评 1-4 → SM-2 更新（<3 重置周期）+ 写 ReviewRecord。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "cue_id": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cue_id",
+          "grade"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_statistics",
+      "description": "聚合统计（subject/knowledge_point/date/mastery）。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "group_by": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_by"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "export_data",
+      "description": "导出 json / markdown 到 data/exports/。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "default": "json",
+            "type": "string"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "type": "object"
+      }
+    }
+  ]
+}

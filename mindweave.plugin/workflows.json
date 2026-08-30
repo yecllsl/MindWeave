@@ -1,0 +1,34 @@
+{
+  "$schema": "https://agents.aaif.io/schemas/workflows.json",
+  "workflows": [
+    {
+      "name": "mindweave-capture",
+      "description": "Use when 用户想录笔记、拍照记笔记、记课堂笔记、整理成康奈尔笔记。NOT for 复习到期笔记（用 mindweave-review）、查看统计（用 mindweave-stats）、导出笔记（用 mindweave-export）",
+      "steps": [
+        {
+          "action": "organize_note",
+          "description": "调用 organize_note：返回康奈尔整理 prompt（三模式：对话多模态 > image_path > text），宿主 LLM 填结构。"
+        },
+        {
+          "action": "save_note",
+          "description": "调用 save_note：pydantic 校验 + 保存笔记（cue 初始化 SM-2 状态）。"
+        }
+      ]
+    },
+    {
+      "name": "mindweave-export",
+      "description": "Use when 用户想导出笔记、备份笔记。NOT for 录入（用 mindweave-capture）、复习（用 mindweave-review）、统计（用 mindweave-stats）",
+      "steps": []
+    },
+    {
+      "name": "mindweave-review",
+      "description": "Use when 用户想复习笔记、该复习了、复习到期知识卡。NOT for 录入新笔记（用 mindweave-capture）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）",
+      "steps": []
+    },
+    {
+      "name": "mindweave-stats",
+      "description": "Use when 用户想看笔记统计、知识点分布、掌握度分布。NOT for 录入（用 mindweave-capture）、复习（用 mindweave-review）、导出（用 mindweave-export）",
+      "steps": []
+    }
+  ]
+}

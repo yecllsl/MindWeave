@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# scripts/pre-commit — 提交前快速门禁（ruff + pytest）
+set -e
+cd mindweave.plugin/mindweave-mcp
+uv run ruff check src tests
+uv run pytest -q
