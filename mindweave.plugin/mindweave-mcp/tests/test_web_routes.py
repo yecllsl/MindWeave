@@ -137,3 +137,30 @@ def test_note_delete_post(client):
     r = client.post("/notes/note_20260830_001/delete", follow_redirects=False)
     assert r.status_code == 303
     assert get_storage().load_note("note_20260830_001") is None
+
+
+# ── review ──
+def test_review_get_200(client):
+    _save_note(due=True)
+    r = client.get("/review")
+    assert r.status_code == 200
+    assert "光合作用的场所是？" in r.text
+
+
+def test_review_submit_updates_sm2(client):
+    _save_note(due=True)
+    r = client.post("/review/submit", data={
+        "cue_id": "note_20260830_001_c1", "grade": "4",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    rs = get_storage().load_note("note_20260830_001").cornell.cues[0].review_state
+    assert rs.repetitions == 1
+    assert len(get_storage().list_all_review_records()) == 1
+
+
+def test_review_submit_invalid_grade(client):
+    _save_note(due=True)
+    r = client.post("/review/submit", data={
+        "cue_id": "note_20260830_001_c1", "grade": "9",
+    }, follow_redirects=False)
+    assert r.status_code == 422

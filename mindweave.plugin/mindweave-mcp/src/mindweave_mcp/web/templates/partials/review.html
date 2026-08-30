@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}复习{% endblock %}
+{% block content %}
+<h2>今日复习</h2>
+<form method="get" action="/review" class="filter-bar">
+    <select name="subject">
+        <option value="">全部学科</option>
+        {% for s in subject_options %}
+        <option value="{{ s }}" {% if s == subject %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">筛选</button>
+</form>
+<p>到期 {{ queue.due_count }} 张，本次展示 {{ queue.returned }} 张（每日上限 10 张）</p>
+{% for c in queue.due_cues %}
+<div class="cue-card">
+    <div class="cue-q">{{ c.question }}</div>
+    <details><summary>回忆后点击查看完整笔记</summary>
+        <div><a href="/notes/{{ c.note_id }}">查看完整笔记（含答案要点）</a></div>
+    </details>
+    <div class="grade-bar">
+        <span>自评：</span>
+        <form method="post" action="/review/submit" class="inline">
+            <input type="hidden" name="cue_id" value="{{ c.cue_id }}">
+            <button type="submit" name="grade" value="1" class="btn grade-1">1 想不起</button>
+            <button type="submit" name="grade" value="2" class="btn grade-2">2 模糊</button>
+            <button type="submit" name="grade" value="3" class="btn grade-3">3 勉强</button>
+            <button type="submit" name="grade" value="4" class="btn grade-4">4 轻松</button>
+        </form>
+    </div>
+</div>
+{% else %}
+<div class="empty-state"><div class="empty-text">今天没有到期卡片 🎉</div></div>
+{% endfor %}
+{% endblock %}
