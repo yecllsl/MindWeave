@@ -17,3 +17,5 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+# pytest-cov 覆盖率产物
+.coverage
