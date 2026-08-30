@@ -17,12 +17,17 @@ def get_storage() -> Storage:
     return Storage(base_dir=_DATA_DIR)
 
 
-def _generate_note_id(storage: Storage) -> str:
+def _generate_id(prefix: str, existing_ids: list[str]) -> str:
+    """生成 {prefix}_YYYYMMDD_NNN，NNN 按当日已有 id 递增（note/quiz 共用）。"""
     today = _now_utc().strftime("%Y%m%d")
-    p = f"note_{today}_"
-    existing = [eid for eid in storage.list_all_note_ids() if eid.startswith(p)]
+    p = f"{prefix}_{today}_"
+    existing = [eid for eid in existing_ids if eid.startswith(p)]
     nnn = max((int(eid.split("_")[-1]) for eid in existing), default=0) + 1
     return f"{p}{nnn:03d}"
+
+
+def _generate_note_id(storage: Storage) -> str:
+    return _generate_id("note", storage.list_all_note_ids())
 
 
 def _init_cues(note_id: str, raw_cues: list[dict[str, Any]]) -> list[Cue]:

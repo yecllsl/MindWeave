@@ -124,3 +124,12 @@ def test_delete_leaves_orphan_review_records(isolated_storage):
     # 笔记已删，但复习记录仍在（孤儿）
     assert len(get_storage().list_all_review_records()) == 1
     assert get_note(r["note_id"])["note"] is None
+
+
+def test_generate_id_generic_prefix(isolated_storage):
+    """前缀参数化的通用 _generate_id：note 与 quiz 各自独立递增（评审 P3-5）。"""
+    from mindweave_mcp.algorithms import _now_utc
+    from mindweave_mcp.tools.crud import _generate_id
+    stamp = _now_utc().strftime("%Y%m%d")
+    assert _generate_id("quiz", []) == f"quiz_{stamp}_001"
+    assert _generate_id("quiz", [f"quiz_{stamp}_001"]) == f"quiz_{stamp}_002"
