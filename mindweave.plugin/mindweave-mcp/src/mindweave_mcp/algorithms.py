@@ -21,6 +21,11 @@ def _today_utc() -> date:
 
 
 def compute_next_review(ease_factor: float, interval: int, repetitions: int, grade: int) -> dict[str, Any]:
+    """按 SM-2 计算下一次复习状态（EF/interval/repetitions/next_review_date）。
+
+    grade 1-4；grade<3 视为失败重置周期（reps=0、间隔=1 天），grade>=3 成功推进
+    （reps 0→1 天 / 1→6 天 / >=2 round(interval×EF)）；EF 无论对错均更新、下限 1.3。
+    """
     if not 1 <= grade <= 4:
         raise ValueError(f"grade 必须在 1-4 之间，收到: {grade}")
 
