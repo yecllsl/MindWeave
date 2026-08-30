@@ -1,5 +1,7 @@
 import pytest
-from mindweave_mcp.algorithms import compute_next_review, MIN_EASE_FACTOR
+
+from mindweave_mcp.algorithms import MIN_EASE_FACTOR, compute_next_review
+
 
 def test_grade_out_of_range_raises():
     with pytest.raises(ValueError):
@@ -22,7 +24,7 @@ def test_third_success_interval_times_ef():
     assert r["repetitions"] == 3 and r["interval"] == round(6 * 2.5)
 
 def test_ease_factor_updates_and_floor():
-    r = compute_next_review(2.5, 6, 2, 4)  # grade 4: SM-2 公式 (0.1 - (5-4)*(0.08+0.02)) = 0 → EF 不变（VocabCraft 已验证语义）
+    r = compute_next_review(2.5, 6, 2, 4)  # grade 4 → EF 不变（VocabCraft 已验证语义）
     assert r["ease_factor"] == pytest.approx(2.5)
     low = compute_next_review(1.3, 1, 0, 1)
     assert low["ease_factor"] == MIN_EASE_FACTOR

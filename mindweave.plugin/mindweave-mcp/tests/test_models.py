@@ -1,7 +1,14 @@
 import pytest
+
 from mindweave_mcp.models import (
-    Cue, Cornell, NoteRecord, ReviewRecord, ReviewState, SUBJECTS,
+    SUBJECTS,
+    Cornell,
+    Cue,
+    NoteRecord,
+    ReviewRecord,
+    ReviewState,
 )
+
 
 def test_subjects_exactly_nine():
     assert SUBJECTS == ["语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"]

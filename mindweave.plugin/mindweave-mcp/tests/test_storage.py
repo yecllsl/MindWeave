@@ -1,5 +1,6 @@
 from mindweave_mcp.models import Cornell, Cue, NoteRecord, ReviewRecord
 
+
 def _note(note_id="note_20260830_001"):
     return NoteRecord(
         note_id=note_id, created_at="2026-08-30T00:00:00",
