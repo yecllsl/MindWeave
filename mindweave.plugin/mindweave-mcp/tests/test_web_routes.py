@@ -40,3 +40,30 @@ def test_dashboard_summary_shows_counts(client):
     _save_note()
     r = client.get("/")
     assert "总笔记" in r.text and "1" in r.text
+
+
+# ── notes 列表/详情 ──
+def test_notes_list_get_200(client):
+    _save_note()
+    r = client.get("/notes")
+    assert r.status_code == 200
+    assert "note_20260830_001" in r.text
+
+
+def test_notes_list_filter_by_subject(client):
+    _save_note(note_id="note_20260830_001", subject="生物")
+    _save_note(note_id="note_20260830_002", subject="数学")
+    r = client.get("/notes", params={"subject": "数学"})
+    assert "note_20260830_002" in r.text
+    assert "note_20260830_001" not in r.text
+
+
+def test_note_detail_get_200(client):
+    _save_note()
+    r = client.get("/notes/note_20260830_001")
+    assert r.status_code == 200
+    assert "光合作用的场所是？" in r.text
+
+
+def test_note_detail_404(client):
+    assert client.get("/notes/note_20990101_001").status_code == 404

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}笔记{% endblock %}
+{% block content %}
+<h2>笔记列表</h2>
+<form method="get" action="/notes" class="filter-bar">
+    <select name="subject">
+        <option value="">全部学科</option>
+        {% for s in subject_options %}
+        <option value="{{ s }}" {% if s == subject %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="keyword" value="{{ keyword }}" placeholder="关键词">
+    <button type="submit">过滤</button>
+</form>
+<table class="data-table">
+    <thead><tr><th>笔记 ID</th><th>学科</th><th>知识点</th><th>卡数</th><th>操作</th></tr></thead>
+    <tbody>
+        {% for n in notes %}
+        <tr>
+            <td><a href="/notes/{{ n.note_id }}">{{ n.note_id }}</a></td>
+            <td>{{ n.subject }}</td>
+            <td>{{ n.knowledge_points | join('、') }}</td>
+            <td>{{ n.cornell.cues | length }}</td>
+            <td>
+                <a href="/notes/{{ n.note_id }}/edit">编辑</a>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty-text">暂无笔记</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

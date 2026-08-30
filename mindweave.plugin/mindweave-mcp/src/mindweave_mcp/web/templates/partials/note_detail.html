@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ note.note_id }}{% endblock %}
+{% block content %}
+<h2>{{ note.note_id }} <span class="tag">{{ note.subject }}</span></h2>
+<p>知识点：{{ note.knowledge_points | join('、') or '无' }}</p>
+<div class="cornell-grid">
+    <section class="cornell-col">
+        <h3>线索栏（知识卡）</h3>
+        {% for c in note.cornell.cues %}
+        <div class="cue-card">
+            <div class="cue-q">{{ c.question }}</div>
+            <details><summary>显示答案要点</summary><div>{{ c.answer_hint }}</div></details>
+            <div class="cue-meta">
+                下次复习：{{ c.review_state.next_review }} · reps={{ c.review_state.repetitions }}
+            </div>
+        </div>
+        {% endfor %}
+    </section>
+    <section class="cornell-col">
+        <h3>笔记栏</h3><div class="note-body">{{ note.cornell.body }}</div>
+        <h3>总结栏</h3><div>{{ note.cornell.summary }}</div>
+    </section>
+</div>
+<div class="action-bar">
+    <a class="btn" href="/notes/{{ note.note_id }}/edit">编辑</a>
+    <form method="post" action="/notes/{{ note.note_id }}/delete" class="inline"
+          onsubmit="return confirm('确认删除该笔记？复习历史将保留为孤儿记录。')">
+        <button type="submit" class="btn btn-danger">删除</button>
+    </form>
+</div>
+{% endblock %}
