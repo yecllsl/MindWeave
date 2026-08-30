@@ -188,6 +188,67 @@
         },
         "type": "object"
       }
+    },
+    {
+      "name": "generate_quiz",
+      "description": "为 cue 渲染命题 prompt 并生成占位 quiz 落盘（宿主 LLM 生成后经 save_quiz 回写）。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "cue_id": {
+            "type": "string"
+          },
+          "quiz_type": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cue_id"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "save_quiz",
+      "description": "题干/选项/答案经 pydantic 校验写回 quiz（选择题校验 answer ∈ options）。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "quiz_id": {
+            "type": "string"
+          },
+          "quiz_data": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "quiz_id",
+          "quiz_data"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "grade_quiz",
+      "description": "判分并更新 SM-2：选择精确匹配（4/1）；填空返回 grade_prompt 语义评分（默认 3）。",
+      "parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "quiz_id": {
+            "type": "string"
+          },
+          "response": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "quiz_id",
+          "response"
+        ],
+        "type": "object"
+      }
     }
   ]
 }

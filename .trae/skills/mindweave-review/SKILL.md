@@ -1,6 +1,6 @@
 ---
 name: mindweave-review
-description: Use when 用户想复习笔记、该复习了、复习到期知识卡。NOT for 录入新笔记（用 mindweave-capture）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）
+description: Use when 用户想复习笔记、该复习了、复习到期知识卡。NOT for 录入新笔记（用 mindweave-capture）、出题测验（用 mindweave-quiz，测验是出题判分，复习是自评，二者都推进 SM-2）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）
 ---
 
 # 笔记复习流程

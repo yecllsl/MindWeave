@@ -2,7 +2,7 @@
 
 基于 Trae IDE CN / Trae Work CN / CodeBuddy / OpenCode（goose 保留未默认支持，不投影）的 K12 康奈尔 AI 智能笔记解决方案。核心流程：拍照/文字录入 → 宿主 LLM 整理为康奈尔笔记（线索栏/笔记栏/总结栏）→ 用户确认保存 → 线索栏问题即知识卡 → 基于 SM-2 遗忘曲线的复习排程 → 到期遮挡回忆自评（1-4 档）→ 统计/导出。配置统一维护在 `mindweave.plugin/`（AAIF 真相源），通过 `scripts/sync-agent-configs` 单向同步到 `.trae/` / `.opencode/` / `.codebuddy/`。
 
-> **打包形态**：`mindweave.plugin/` 同时是符合 **Agent Plugins 1.0**（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）规范的 Agent Plugin —— 根目录含 `plugin.json`（manifest）、`mcp.json`（MCP 启动配置）、`skills/`（4 个 Skill），可直接作为标准插件分发到任意兼容客户端。各 harness 原生目录（`.trae/` 等）仍由 `scripts/sync-agent-configs` 单向生成，互不冲突。
+> **打包形态**：`mindweave.plugin/` 同时是符合 **Agent Plugins 1.0**（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）规范的 Agent Plugin —— 根目录含 `plugin.json`（manifest）、`mcp.json`（MCP 启动配置）、`skills/`（5 个 Skill），可直接作为标准插件分发到任意兼容客户端。各 harness 原生目录（`.trae/` 等）仍由 `scripts/sync-agent-configs` 单向生成，互不冲突。
 
 ## 系统架构
 
@@ -19,18 +19,19 @@
     ↓
 Skills 编排层 (配置定义，由 mindweave.plugin/skills/ 同步三平台)
 ├── mindweave.plugin/skills/mindweave-* （单向同步到 .trae/.opencode/.codebuddy）
-├── 4 个 Skill: capture / review / stats / export
+├── 5 个 Skill: capture / review / quiz / stats / export
     ↓
 服务层 (mindweave_mcp，位于 mindweave.plugin/mindweave-mcp/)
 ├── MCP Tools: 5 CRUD (save/get/query/update/delete)
-│             + 5 业务 (organize/schedule/submit/statistics/export)
-├── prompts/ (康奈尔整理提示模板)
+│             + 8 业务 (organize/schedule/submit/statistics/export
+│                       + generate_quiz/save_quiz/grade_quiz)
+├── prompts/ (康奈尔整理提示模板 + quiz 命题/判分模板)
 ├── tools/   (各业务逻辑)   models.py   algorithms.py (SM-2)   storage.py   server.py
     ↓
 规则层 (mindweave.plugin/AGENTS.md — 统一规则源)
     ↓
 数据存储层 (本地 JSON 文件，原子写入)
-├── data/notes/  data/reviews/  data/exports/  data/images/
+├── data/notes/  data/reviews/  data/exports/  data/images/  data/quizzes/
 ```
 
 ## 技术栈
@@ -41,6 +42,7 @@ Skills 编排层 (配置定义，由 mindweave.plugin/skills/ 同步三平台)
 - **数据存储**: JSON 文件（本地存储，原子写入）
 - **包管理**: uv
 - **测试**: pytest + pytest-asyncio + pytest-cov
+- **Web 可视化**: FastAPI + Jinja2 + HTMX/Alpine + ECharts（本地人工处理面，默认 127.0.0.1:8003）
 - **插件规范**: Agent Plugins 1.0（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）
 
 ## 开发规范
@@ -72,7 +74,7 @@ Not lazy about: input validation at trust boundaries, error handling that preven
 ### 安全规则
 
 - 不信任外部数据（配置文件、CLI 参数）；文件路径必须 `Path.resolve()` 规范化并拒绝 `..`；限制解析文件大小；捕获解析异常；禁用 `eval()` / `pickle` 反序列化不可信数据。
-- 禁止硬编码 API 密钥 / Token / 密码；`.gitignore` 必须排除用户数据（`data/notes/`、`data/reviews/`、`data/images/`、`data/exports/`）；不将密钥或用户数据提交到 Git；日志不记录敏感数据；安全场景禁用 MD5/SHA1。
+- 禁止硬编码 API 密钥 / Token / 密码；`.gitignore` 必须排除用户数据（`data/notes/`、`data/reviews/`、`data/images/`、`data/exports/`、`data/quizzes/`）；不将密钥或用户数据提交到 Git；日志不记录敏感数据；安全场景禁用 MD5/SHA1。
 - 禁止操作项目目录之外的文件；禁止执行不可逆的系统修改命令；发现安全问题立即停止并修复后再继续。
 
 ### Prompt 防御规则
@@ -126,7 +128,7 @@ Not lazy about: input validation at trust boundaries, error handling that preven
 
 ### 交互规则
 
-1. 命令：`/capture`、`/review`、`/stats`、`/export`；自然语言关键词：录笔记/复习/统计/导出。
+1. 命令：`/capture`、`/review`、`/quiz`、`/stats`、`/export`；自然语言关键词：录笔记/复习/出题/测验/统计/导出。
 2. 每次操作给明确反馈（成功/失败/降级提示）。
 3. 错误时提供降级方案而非直接报错；图片解析失败降级手动输入；AI 整理异常给友好提示与重试。
 4. 解析结果、导出操作必须经用户确认后才执行。
@@ -149,6 +151,7 @@ Not lazy about: input validation at trust boundaries, error handling that preven
 |------|--------|-------|----------------|
 | `/capture` | 录笔记/拍照记笔记/记课堂笔记 | mindweave-capture | `organize_note`（对话>路径>文本）、`save_note` |
 | `/review` | 复习笔记/该复习了 | mindweave-review | `schedule_review`、`submit_review` |
+| `/quiz` | 出题/考我/练一练/测验 | mindweave-quiz | `generate_quiz`、`save_quiz`、`grade_quiz` |
 | `/stats` | 笔记统计/知识点分布/掌握度 | mindweave-stats | `get_statistics`（group_by: subject/knowledge_point/date/mastery） |
 | `/export` | 导出笔记/备份 | mindweave-export | `export_data`（json/markdown） |
 
@@ -166,3 +169,6 @@ Not lazy about: input validation at trust boundaries, error handling that preven
 | `submit_review` | cue 自评 1-4 → SM-2 更新（<3 重置周期）+ 写 ReviewRecord | `cue_id`、`grade` |
 | `get_statistics` | 按维度聚合统计 | `group_by` |
 | `export_data` | 导出笔记数据到文件 | `format`(json/markdown)、`filters` |
+| `generate_quiz` | 为 cue 渲染命题 prompt 并生成占位 quiz 落盘（宿主 LLM 生成后经 save_quiz 回写） | `cue_id`、`quiz_type`(选择/填空) |
+| `save_quiz` | 题干/选项/答案经 pydantic 校验写回 quiz（选择题校验 answer ∈ options） | `quiz_id`、`quiz_data` |
+| `grade_quiz` | 判分并更新 SM-2：选择精确匹配（4/1，归一化后比较）；填空返回 grade_prompt 语义评分（默认 3 推进） | `quiz_id`、`response` |

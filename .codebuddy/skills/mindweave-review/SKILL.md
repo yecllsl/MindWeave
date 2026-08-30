@@ -1,6 +1,6 @@
 ---
 name: mindweave-review
-description: Use when 用户想复习笔记、该复习了、复习到期知识卡。NOT for 录入新笔记（用 mindweave-capture）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）
+description: Use when 用户想复习笔记、该复习了、复习到期知识卡。NOT for 录入新笔记（用 mindweave-capture）、出题测验（用 mindweave-quiz，测验是出题判分，复习是自评，二者都推进 SM-2）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）
 ---
 
 # 笔记复习流程
@@ -14,7 +14,7 @@ description: Use when 用户想复习笔记、该复习了、复习到期知识�
 ## Workflow
 
 ### 1. 取到期队列
-调用 `schedule_review()`（可选 `subject` 过滤）。每日上限 10 卡。
+调用 `schedule_review`（可选 `subject` 过滤）。每日上限 10 卡。
 
 ### 2. 逐卡复习
 对每张到期卡：
@@ -23,7 +23,7 @@ description: Use when 用户想复习笔记、该复习了、复习到期知识�
 3. 用户自评 1-4（4 轻松想起 / 3 勉强想起 / 2 模糊 / 1 想不起）
 
 ### 3. 提交评分
-调用 `submit_review(cue_id=..., grade=...)`。
+调用 `submit_review`（传 `cue_id` 与用户自评 `grade` 1-4）。
 
 ### 4. 汇总
 输出：复习卡数、grade 分布、grade<3 薄弱卡清单、下次复习日期分布。

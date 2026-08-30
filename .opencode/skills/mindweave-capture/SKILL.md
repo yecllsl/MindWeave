@@ -19,9 +19,9 @@ description: Use when 用户想录笔记、拍照记笔记、记课堂笔记、�
 
 ### 2. 宿主 LLM 整理
 调用 `organize_note`：
-- 对话上传：`organize_note()`（无参）
-- 本地路径：`organize_note(image_path=...)`
-- 文本：`organize_note(text=...)`
+- 对话上传：`organize_note`（无参）
+- 本地路径：`organize_note`（传 `image_path`）
+- 文本：`organize_note`（传 `text`）
 
 宿主 LLM 按返回的 parse_prompt 输出结构化 JSON（subject/knowledge_points/cornell）。
 
@@ -35,7 +35,7 @@ description: Use when 用户想录笔记、拍照记笔记、记课堂笔记、�
 - **跳过用户确认就 save_note**：解析结果必须用户确认
 - **cue 为空仍保存**：cues 至少 1 条，AI 未提取时生成占位 cue 标记待确认
 - **图片外传**：图片仅存 `data/images/`，禁止上传外部服务
-- **对话上传后仍传 image_path**：无参 `organize_note()` 即可
+- **对话上传后仍传 image_path**：无参 `organize_note` 即可
 
 ## Red Flags
 - 未经确认就调用 `save_note`

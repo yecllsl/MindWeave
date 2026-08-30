@@ -27,6 +27,18 @@
     },
     {
       "type": "command",
+      "pattern": "^/quiz(\\s.*)?$",
+      "handler": "handle_command",
+      "description": "mindweave-quiz 命令触发器"
+    },
+    {
+      "type": "conversation",
+      "pattern": "(?i)(出题|考我|练一练|测验|测试我)",
+      "handler": "handle_trigger",
+      "description": "mindweave-quiz 对话触发器"
+    },
+    {
+      "type": "command",
       "pattern": "^/review(\\s.*)?$",
       "handler": "handle_command",
       "description": "mindweave-review 命令触发器"

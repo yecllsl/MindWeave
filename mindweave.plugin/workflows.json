@@ -26,8 +26,34 @@
       ]
     },
     {
+      "name": "mindweave-quiz",
+      "description": "Use when 用户想出题考我、做笔记测验、练一练、随机测一测知识卡。NOT for 录入新笔记（用 mindweave-capture）、到期复习（用 mindweave-review，复习是自评驱动，quiz 是出题测验，二者都推进 SM-2）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）",
+      "steps": [
+        {
+          "action": "generate_quiz",
+          "description": "调用 generate_quiz：为 cue 渲染命题 prompt 并生成占位 quiz 落盘（宿主 LLM 生成后经 save_quiz 回写）。"
+        },
+        {
+          "action": "save_quiz",
+          "description": "调用 save_quiz：题干/选项/答案经 pydantic 校验写回 quiz（选择题校验 answer ∈ options）。"
+        },
+        {
+          "action": "grade_quiz",
+          "description": "调用 grade_quiz：判分并更新 SM-2：选择精确匹配（4/1）；填空返回 grade_prompt 语义评分（默认 3）。"
+        },
+        {
+          "action": "schedule_review",
+          "description": "调用 schedule_review：到期 cue 队列（next_review <= 今天，可按学科筛）。"
+        },
+        {
+          "action": "query_notes",
+          "description": "调用 query_notes：按学科/知识点/日期/关键词过滤。"
+        }
+      ]
+    },
+    {
       "name": "mindweave-review",
-      "description": "Use when 用户想复习笔记、该复习了、复习到期知识卡。NOT for 录入新笔记（用 mindweave-capture）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）",
+      "description": "Use when 用户想复习笔记、该复习了、复习到期知识卡。NOT for 录入新笔记（用 mindweave-capture）、出题测验（用 mindweave-quiz，测验是出题判分，复习是自评，二者都推进 SM-2）、查看统计（用 mindweave-stats）、导出（用 mindweave-export）",
       "steps": [
         {
           "action": "schedule_review",
