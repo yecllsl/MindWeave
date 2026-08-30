@@ -1,6 +1,6 @@
-"""quiz 工具链测试：generate（占位落盘）/ save（校验回写）。"""
+"""quiz 工具链测试：generate（占位落盘）/ save（校验回写）/ grade（判分推进 SM-2）。"""
 from mindweave_mcp.tools.crud import get_storage
-from mindweave_mcp.tools.quiz import generate_quiz, save_quiz
+from mindweave_mcp.tools.quiz import generate_quiz, grade_quiz, save_quiz
 
 
 def _save_note(cues=None, subject="生物", note_id="note_20260830_001"):
@@ -104,3 +104,104 @@ def test_save_quiz_forbidden_fields_ignored(isolated_storage):
     assert "error" not in back
     quiz = get_storage().load_quiz(r["quiz_id"])
     assert quiz.quiz_id == r["quiz_id"] and quiz.answered is False and quiz.grade is None
+
+
+# ── grade_quiz ──
+
+def _ready_quiz(quiz_type="选择", answer="叶绿体", options=None):
+    """生成并回写一道可判分的 quiz，返回 quiz_id。"""
+    _save_note()
+    r = generate_quiz(cue_id="note_20260830_001_c1", quiz_type=quiz_type)
+    save_quiz(r["quiz_id"], {
+        "question": "q",
+        "options": options if options is not None else (
+            ["叶绿体", "线粒体", "核糖体", "内质网"] if quiz_type == "选择" else []),
+        "answer": answer,
+    })
+    return r["quiz_id"]
+
+
+def _rs():
+    from mindweave_mcp.tools.crud import get_note
+    return get_note("note_20260830_001")["note"]["cornell"]["cues"][0]["review_state"]
+
+
+def test_grade_choice_correct(isolated_storage):
+    qid = _ready_quiz()
+    r = grade_quiz(qid, response="叶绿体")
+    assert r["grade"] == 4 and r["correct"] is True
+    assert _rs()["repetitions"] == 1
+
+
+def test_grade_choice_wrong(isolated_storage):
+    qid = _ready_quiz()
+    r = grade_quiz(qid, response="线粒体")
+    assert r["grade"] == 1 and r["correct"] is False
+    assert _rs()["repetitions"] == 0
+
+
+def test_grade_choice_normalizes_fullwidth_and_spaces(isolated_storage):
+    """strip + NFKC 全角半角归一化后匹配（评审 P2-4 定稿）。"""
+    qid = _ready_quiz()
+    r = grade_quiz(qid, response=" 叶绿体 ")
+    assert r["correct"] is True and r["grade"] == 4
+
+
+def test_grade_choice_fullwidth_space_normalized(isolated_storage):
+    """全角空格（U+3000）归一化后判对。"""
+    qid = _ready_quiz()
+    r = grade_quiz(qid, response="\u3000叶绿体\u3000")
+    assert r["correct"] is True and r["grade"] == 4
+
+
+def test_grade_fill_returns_grade_prompt_and_default_3(isolated_storage):
+    """填空=语义题：返回 grade_prompt，宿主未回传默认 grade=3 推进（B2 口径）。"""
+    qid = _ready_quiz(quiz_type="填空", answer="叶绿体")
+    r = grade_quiz(qid, response="叶绿素体")  # 部分正确但非精确
+    assert "grade_prompt" in r
+    assert "学生作答" in r["grade_prompt"]
+    assert r["grade"] == 3
+    assert _rs()["repetitions"] == 1
+
+
+def test_grade_writes_review_record_source_quiz(isolated_storage):
+    qid = _ready_quiz()
+    grade_quiz(qid, response="叶绿体")
+    recs = get_storage().list_all_review_records()
+    assert len(recs) == 1 and recs[0].source == "quiz"
+
+
+def test_grade_missing_quiz_returns_error(isolated_storage):
+    assert "error" in grade_quiz("quiz_20990101_001", response="a")
+
+
+def test_grade_empty_response_rejected(isolated_storage):
+    """硬防御①：空作答一律拒绝，不以默认 grade 推进 SM-2。"""
+    qid = _ready_quiz()
+    r = grade_quiz(qid, response="  ")
+    assert "error" in r
+    assert _rs()["repetitions"] == 0
+
+
+def test_grade_placeholder_answer_rejected(isolated_storage):
+    """硬防御②：占位题（answer 空）拒绝评分。"""
+    _save_note()
+    r = generate_quiz(cue_id="note_20260830_001_c1", quiz_type="选择")
+    assert "error" in grade_quiz(r["quiz_id"], response="叶绿体")
+
+
+def test_grade_already_answered_rejected(isolated_storage):
+    """硬防御③：已判分 quiz 拒绝二次评分，SM-2 不被二次推进（评审 P1-1 定稿）。"""
+    qid = _ready_quiz()
+    grade_quiz(qid, response="叶绿体")
+    reps_after_first = _rs()["repetitions"]
+    r = grade_quiz(qid, response="线粒体")
+    assert "error" in r
+    assert _rs()["repetitions"] == reps_after_first
+
+
+def test_grade_marks_quiz_answered(isolated_storage):
+    qid = _ready_quiz()
+    grade_quiz(qid, response="叶绿体")
+    quiz = get_storage().load_quiz(qid)
+    assert quiz.answered is True and quiz.grade == 4

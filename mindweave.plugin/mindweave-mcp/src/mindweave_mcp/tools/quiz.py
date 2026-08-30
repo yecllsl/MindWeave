@@ -6,6 +6,7 @@ save_quiz 经 QuizRecord 校验回写，禁止宿主直写 quizzes/ 文件（pro
 """
 from __future__ import annotations
 
+import unicodedata
 from typing import Any
 
 from pydantic import ValidationError
@@ -16,7 +17,9 @@ from mindweave_mcp.prompts.quiz_generate_prompt import (
     FILL_GENERATE_PROMPT,
     SELECT_GENERATE_PROMPT,
 )
+from mindweave_mcp.prompts.quiz_grade_prompt import GRADE_PROMPT
 from mindweave_mcp.tools.crud import _generate_id, get_storage
+from mindweave_mcp.tools.review import apply_review
 
 # 占位题干文本：generate 后未 save_quiz 回写的可见标记
 _PLACEHOLDER_QUESTION = "（占位题干，请用 generate_prompt 调用 LLM 生成真实题干）"
@@ -107,3 +110,61 @@ def save_quiz(quiz_id: str, quiz_data: dict[str, Any]) -> dict[str, Any]:
         return {"error": f"题目回写失败: {exc}"}
     storage.save_quiz(updated)
     return {"quiz_id": quiz_id, "saved": True}
+
+
+def _normalize_answer(s: str) -> str:
+    """判分归一化：NFKC（全角→半角、全角标点→ASCII）+ strip + lower（评审 P2-4）。"""
+    return unicodedata.normalize("NFKC", s).strip().lower()
+
+
+def grade_quiz(quiz_id: str, response: str) -> dict[str, Any]:
+    """判分并按 SM-2 更新 cue 记忆状态（与 submit_review 等价推进）。
+
+    判分口径（spec §2）：选择=客观题精确匹配（对→4/错→1，归一化后比较）；
+    填空=语义题返回 grade_prompt 交宿主 LLM 评分，未回传默认 grade=3 推进。
+    """
+    storage = get_storage()
+    quiz = storage.load_quiz(quiz_id)
+    if quiz is None:
+        return {"error": f"quiz 不存在: {quiz_id}"}
+    # 硬防御①：空作答不是有效学习反馈，放行会以默认 grade 污染 SM-2
+    if not (response or "").strip():
+        return {"error": "作答为空，不允许评分", "quiz_id": quiz_id}
+    # 硬防御②：占位题（answer 未回写）拒绝评分，防 ""=="" 得 grade=4
+    if not quiz.answer.strip():
+        return {"error": "该题答案为空（占位题尚未回写），不允许评分", "quiz_id": quiz_id}
+    # 硬防御③：已判分 quiz 拒绝二次评分，防 SM-2 被二次推进
+    if quiz.answered:
+        return {"error": "该题已判分，不允许重复评分", "quiz_id": quiz_id}
+
+    result: dict[str, Any] = {"quiz_id": quiz_id, "cue_id": quiz.cue_id}
+    if quiz.quiz_type == "选择":
+        correct = _normalize_answer(response) == _normalize_answer(quiz.answer)
+        grade = 4 if correct else 1
+        result["correct"] = correct
+    else:  # 填空=语义题
+        result["grade_prompt"] = GRADE_PROMPT.format(
+            question=quiz.question, reference_answer=quiz.answer, user_answer=response,
+        )
+        result["correct"] = None
+        # ponytail: 宿主 LLM 未回传语义评分时默认 grade=3 推进（VocabCraft 释义题同款降级）。
+        # 已知取舍：对可能答错的语义题偏乐观；升级路径为「未回传不写 ReviewRecord、
+        # 不推进 SM-2、仅提示重试」或新增回传工具。
+        grade = 3
+    result["grade"] = grade
+
+    # 先推进 SM-2（apply_review 失败则 quiz 不标 answered，避免「已判分但记忆未推进」
+    # 的死锁记录：若先 save answered=True 再 apply_review 失败，防御③会拒绝重判，评审 B1）。
+    review_result = apply_review(quiz.cue_id, grade, source="quiz")
+    if "error" in review_result:
+        result["error"] = review_result["error"]
+        return result
+
+    # apply_review 成功后落盘判分状态。注：此处用 model_copy 而非重建校验，因为写入的
+    # answered/grade 是服务端可信值（grade 已由判分防御保证 1-4），无需再触发 validator。
+    storage.save_quiz(quiz.model_copy(update={"answered": True, "grade": grade}))
+
+    result["next_review"] = review_result["next_review"]
+    result["repetitions"] = review_result["repetitions"]
+    result["ease_factor"] = review_result["ease_factor"]
+    return result
