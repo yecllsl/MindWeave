@@ -1,2 +1,7 @@
 # 设计/评审过程文档（本地保存，不入库、不上传远程）
 docs/
+
+# uv / python 沙箱缓存与虚拟环境
+.uv-cache/
+.venv/
+__pycache__/
