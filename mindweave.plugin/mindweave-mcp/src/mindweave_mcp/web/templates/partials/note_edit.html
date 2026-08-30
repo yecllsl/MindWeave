@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}编辑 {{ note.note_id }}{% endblock %}
+{% block content %}
+<h2>编辑笔记 {{ note.note_id }}</h2>
+<p class="hint-text">提示：修改线索问题（question）会重置该卡的复习状态（reps=0、次日复习）；仅改答案要点/笔记栏/总结栏不影响复习进度。</p>
+<form method="post" action="/notes/{{ note.note_id }}/edit" class="edit-form">
+    <label>学科
+        <select name="subject">
+            {% for s in subject_options %}
+            <option value="{{ s }}" {% if s == note.subject %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>知识点（逗号分隔）
+        <input type="text" name="knowledge_points" value="{{ note.knowledge_points | join(',') }}">
+    </label>
+    <label>笔记栏<textarea name="body" rows="6">{{ note.cornell.body }}</textarea></label>
+    <label>总结栏<textarea name="summary" rows="3">{{ note.cornell.summary }}</textarea></label>
+
+    <h3>线索栏（至少 1 条）</h3>
+    {% for c in note.cornell.cues %}
+    <div class="cue-edit-row">
+        <input type="hidden" name="cue_id" value="{{ c.cue_id }}">
+        <input type="text" name="cue_question" value="{{ c.question }}" placeholder="线索问题">
+        <input type="text" name="cue_answer_hint" value="{{ c.answer_hint }}" placeholder="答案要点">
+        <label class="del-check"><input type="checkbox" name="cue_del" value="{{ c.cue_id }}"> 删除</label>
+    </div>
+    {% endfor %}
+    {% for _ in range(3) %}
+    <div class="cue-edit-row">
+        <input type="hidden" name="cue_id" value="">
+        <input type="text" name="cue_question" value="" placeholder="新增线索问题（留空则忽略）">
+        <input type="text" name="cue_answer_hint" value="" placeholder="新增答案要点">
+    </div>
+    {% endfor %}
+    <div class="action-bar">
+        <button type="submit" class="btn">保存</button>
+        <a class="btn btn-secondary" href="/notes/{{ note.note_id }}">取消</a>
+    </div>
+</form>
+{% endblock %}

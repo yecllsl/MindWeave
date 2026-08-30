@@ -67,3 +67,73 @@ def test_note_detail_get_200(client):
 
 def test_note_detail_404(client):
     assert client.get("/notes/note_20990101_001").status_code == 404
+
+
+# ── notes 编辑/删除（人工处理页）──
+def test_note_edit_get_form(client):
+    _save_note()
+    r = client.get("/notes/note_20260830_001/edit")
+    assert r.status_code == 200
+    assert "光合作用的场所是？" in r.text  # 表单回显既有 cue
+    assert "修改线索问题" in r.text  # 提示文案
+
+
+def test_note_edit_post_updates_note(client):
+    _save_note()
+    r = client.post("/notes/note_20260830_001/edit", data={
+        "subject": "化学", "knowledge_points": "细胞,代谢",
+        "body": "新笔记栏", "summary": "新总结",
+        "cue_id": "note_20260830_001_c1",
+        "cue_question": "新问题", "cue_answer_hint": "新答案",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    note = get_storage().load_note("note_20260830_001")
+    assert note.subject == "化学" and note.cornell.body == "新笔记栏"
+    assert note.cornell.cues[0].question == "新问题"
+
+
+def test_note_edit_question_change_resets_review_state(client):
+    """question 变更 → review_state 重置（update_note 既有规则经 web 路径生效）。"""
+    from mindweave_mcp.tools.crud import get_note
+    from mindweave_mcp.tools.review import submit_review
+    _save_note(due=True)
+    submit_review("note_20260830_001_c1", 4)  # reps 0→1
+    client.post("/notes/note_20260830_001/edit", data={
+        "subject": "生物", "knowledge_points": "", "body": "", "summary": "",
+        "cue_id": "note_20260830_001_c1",
+        "cue_question": "改后的问题", "cue_answer_hint": "叶绿体",
+    })
+    rs = get_note("note_20260830_001")["note"]["cornell"]["cues"][0]["review_state"]
+    assert rs["repetitions"] == 0 and rs["interval"] == 0
+
+
+def test_note_edit_add_and_delete_cues(client):
+    """cue 增删改：删 c1、保留 c2、新增一行（cue_id 空）。"""
+    from mindweave_mcp.models import Cornell, Cue, NoteRecord
+    n = NoteRecord(
+        note_id="note_20260830_002", created_at="2026-08-30T00:00:00",
+        updated_at="2026-08-30T00:00:00", subject="数学",
+        cornell=Cornell(cues=[
+            Cue(cue_id="note_20260830_002_c1", question="旧1"),
+            Cue(cue_id="note_20260830_002_c2", question="旧2"),
+        ]),
+    )
+    get_storage().save_note(n, overwrite=True)
+    client.post("/notes/note_20260830_002/edit", data={
+        "subject": "数学", "knowledge_points": "", "body": "", "summary": "",
+        "cue_id": ["note_20260830_002_c1", "note_20260830_002_c2", ""],
+        "cue_question": ["旧1", "旧2改", "全新问题"],
+        "cue_answer_hint": ["", "hint2", "hint3"],
+        "cue_del": "note_20260830_002_c1",
+    })
+    cues = get_storage().load_note("note_20260830_002").cornell.cues
+    assert [c.question for c in cues] == ["旧2改", "全新问题"]
+    # 新 cue 分配不碰撞 id
+    assert cues[1].cue_id == "note_20260830_002_c3"
+
+
+def test_note_delete_post(client):
+    _save_note()
+    r = client.post("/notes/note_20260830_001/delete", follow_redirects=False)
+    assert r.status_code == 303
+    assert get_storage().load_note("note_20260830_001") is None
