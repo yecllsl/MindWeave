@@ -1,0 +1,45 @@
+[project]
+name = "mindweave-mcp"
+version = "0.1.0"
+description = "K12 康奈尔 AI 智能笔记 MCP Server"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=3.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.16.0",
+    "mypy>=1.10.0",
+]
+
+[project.scripts]
+mindweave-mcp = "mindweave_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mindweave_mcp"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/mindweave_mcp/prompts/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
