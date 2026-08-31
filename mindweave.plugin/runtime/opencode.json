@@ -1,8 +1,17 @@
 {
-  "mcpServers": {
+  "mcp": {
     "mindweave-mcp": {
-      "command": "uv",
-      "args": ["run", "--no-sync", "--directory", "${workspaceFolder}/mindweave.plugin/mindweave-mcp", "mindweave-mcp"]
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "mindweave-mcp"
+      ],
+      "cwd": "mindweave.plugin/mindweave-mcp"
     }
-  }
+  },
+  "instructions": [
+    "mindweave.plugin/AGENTS.md"
+  ]
 }
