@@ -21,3 +21,4 @@ __pycache__/
 .ruff_cache/
 # pytest-cov 覆盖率产物
 .coverage
+coverage.xml

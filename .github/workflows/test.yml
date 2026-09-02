@@ -1,0 +1,116 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ──────────────────────────────────────────
+  # 单元 + 集成测试
+  # 无重依赖，跑得最快
+  # ──────────────────────────────────────────
+  unit-tests:
+    name: Unit & Integration (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+
+    - name: Cache uv
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-${{ hashFiles('mindweave.plugin/mindweave-mcp/uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-
+
+    - name: Install dependencies
+      run: |
+        cd mindweave.plugin/mindweave-mcp
+        uv sync --extra dev
+
+    - name: Run unit & integration tests
+      run: |
+        cd mindweave.plugin/mindweave-mcp
+        uv run pytest tests/ -v --cov=src --cov-report=xml --cov-fail-under=80
+
+    - name: Upload coverage
+      if: matrix.python-version == '3.12' && always()
+      uses: codecov/codecov-action@v6
+      with:
+        files: ./mindweave.plugin/mindweave-mcp/coverage.xml
+        fail_ci_if_error: false
+
+  # ──────────────────────────────────────────
+  # 质量门禁：ruff / mypy / bandit
+  # 单独成 job，跑得最快，失败不阻塞测试矩阵
+  # ──────────────────────────────────────────
+  quality-gates:
+    name: Quality Gates (ruff / mypy / bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+
+    - name: Cache uv
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-${{ hashFiles('mindweave.plugin/mindweave-mcp/uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-
+
+    - name: Install dependencies (incl. QC tools)
+      run: |
+        cd mindweave.plugin/mindweave-mcp
+        uv sync --extra dev
+
+    - name: ruff
+      run: |
+        cd mindweave.plugin/mindweave-mcp
+        uv run ruff check .
+
+    - name: mypy
+      run: |
+        cd mindweave.plugin/mindweave-mcp
+        uv run mypy src
+
+    - name: bandit
+      run: |
+        cd mindweave.plugin/mindweave-mcp
+        uv run bandit -r src -c pyproject.toml
+
+  # ──────────────────────────────────────────
+  # 配置漂移检查：四平台生成目录必须与 mindweave.plugin 真相源一致
+  # 作为 pre-commit 钩子的 CI 兜底（防止绕过钩子 push 时漂移悄悄进仓库）
+  # ──────────────────────────────────────────
+  config-drift:
+    name: Config Drift Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Check AAIF config drift
+      run: |
+        sh scripts/check-config-drift.sh

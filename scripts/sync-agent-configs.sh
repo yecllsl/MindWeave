@@ -31,11 +31,13 @@ echo "配置源: mindweave.plugin/ (AAIF 标准)"
 SKIP_TRAE=false
 SKIP_OPENCODE=false
 SKIP_CODEBUDDY=false
+SKIP_GOOSE=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-trae) SKIP_TRAE=true; shift ;;
         --skip-opencode) SKIP_OPENCODE=true; shift ;;
         --skip-codebuddy) SKIP_CODEBUDDY=true; shift ;;
+        --skip-goose) SKIP_GOOSE=true; shift ;;
         *) echo "未知参数: $1"; exit 1 ;;
     esac
 done
@@ -113,6 +115,25 @@ generate_aaif_declarations() {
     echo -e "${GREEN}  已生成 tools.json / triggers.json / workflows.json${NC}"
 }
 
+generate_goose_config() {
+    if ! command -v uv >/dev/null 2>&1; then
+        echo -e "${RED}未找到 uv，无法生成 Goose 配置${NC}" >&2
+        exit 1
+    fi
+    local goose_dir="$PROJECT_ROOT/.goose"
+    mkdir -p "$goose_dir"
+    sync_skills "$goose_dir"
+    sync_agents_md "$goose_dir"
+    echo -e "${YELLOW}生成 Goose 配置 → .goose/config.yaml${NC}"
+    # generate-goose-config.py 内部用 Path(__file__).resolve() 定位项目根，无需 --directory
+    uv run --no-sync python "$SCRIPT_DIR/generate-goose-config.py"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Goose 配置生成失败${NC}" >&2
+        exit 1
+    fi
+    echo -e "${GREEN}  已生成 .goose/config.yaml${NC}"
+}
+
 generate_aaif_declarations
 
 if [ "$SKIP_TRAE" = false ]; then
@@ -132,5 +153,9 @@ if [ "$SKIP_CODEBUDDY" = false ]; then
     sync_skills "$PROJECT_ROOT/.codebuddy"
     sync_agents_md "$PROJECT_ROOT/.codebuddy"
     generate_codebuddy_config
+fi
+if [ "$SKIP_GOOSE" = false ]; then
+    echo -e "\n${CYAN}--- Goose ---${NC}"
+    generate_goose_config
 fi
 echo -e "\n${CYAN}=== 同步完成 ===${NC}"
