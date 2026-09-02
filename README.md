@@ -1,6 +1,6 @@
 # MindWeave - K12 康奈尔 AI 智能笔记 Agent Plugin（skills + MCP 一体）
 
-K12 康奈尔 AI 智能笔记一体化解决方案，支持 **Trae IDE CN / Trae Work CN**、**CodeBuddy**、**OpenCode**（goose 保留但未默认支持）。核心流程：拍照/文字录入 → 宿主 LLM 整理为康奈尔笔记（线索栏/笔记栏/总结栏）→ 用户确认保存 → 线索栏问题即知识卡 → 基于 SM-2 遗忘曲线的复习排程 → 到期遮挡回忆自评（1-4 档）→ 统计/导出。
+K12 康奈尔 AI 智能笔记一体化解决方案，支持 **Trae**、**CodeBuddy**、**OpenCode**、**Goose**（goose 作为 AAIF 标准验证 harness）。核心流程：拍照/文字录入 → 宿主 LLM 整理为康奈尔笔记（线索栏/笔记栏/总结栏）→ 用户确认保存 → 线索栏问题即知识卡 → 基于 SM-2 遗忘曲线的复习排程 → 到期遮挡回忆自评（1-4 档）→ 统计/导出。
 
 设计理念：康奈尔笔记法的**线索栏（Cue Column）天然就是复习卡的正面**——「整理笔记」与「生成复习卡」是同一动作，无需两套实体流程（RemNote 模式，笔记即学习材料闭环）。
 
@@ -23,7 +23,7 @@ K12 康奈尔 AI 智能笔记一体化解决方案，支持 **Trae IDE CN / Trae
 ```
 用户交互层
 ├── 对话式交互 (命令 / 自然语言)
-├── 四运行时: Trae + CodeBuddy + OpenCode（goose 保留未默认支持）
+├── 四运行时: Trae + CodeBuddy + OpenCode + Goose
     ↓
 Skills 编排层 (mindweave.plugin/skills/mindweave-*: capture / review / quiz / stats / export)
     ↓
@@ -52,7 +52,7 @@ Rules 约束层 (mindweave.plugin/AGENTS.md — 统一规则源)
 
 - Python 3.12+
 - [uv 包管理器](https://docs.astral.sh/uv/)（Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`）
-- Trae IDE CN / Trae Work CN、CodeBuddy 或 OpenCode（任选其一）
+- Trae、CodeBuddy、OpenCode 或 Goose（任选其一）
 
 ### 安装（同步配置 + 生成声明）
 
@@ -70,7 +70,7 @@ bash scripts/sync-agent-configs.sh
 
 ##### Trae
 
-1. 用 Trae IDE CN 或 Trae Work CN 打开项目文件夹
+1. 用 Trae 打开项目文件夹
 2. 进入 **设置 → MCP**，打开 **"启用项目级 MCP"** 开关
 3. 进入 **设置 → 规则**，开启 **"将 AGENTS.md 包含在上下文中"**
 4. 重启 Trae
@@ -81,6 +81,11 @@ bash scripts/sync-agent-configs.sh
 
 1. 运行同步脚本生成 `.codebuddy/` / `.opencode/` 投影
 2. 用 CodeBuddy / OpenCode 打开项目文件夹，信任 mindweave-mcp
+
+##### Goose（AAIF 标准验证 harness）
+
+1. 运行同步脚本生成 `.goose/config.yaml`（`extensions` schema，`--directory` 解析为绝对路径）
+2. 用 Goose 打开项目文件夹，自动读取 `.goose/config.yaml` 加载 mindweave-mcp
 
 ### 开始使用
 
@@ -117,13 +122,13 @@ MindWeave/
 │   ├── tools.json / triggers.json / workflows.json   # AAIF 声明（脚本生成，勿手改）
 │   ├── .codebuddy-plugin/plugin.json     # CodeBuddy CLI 插件身份
 │   ├── runtime/{trae,codebuddy,opencode,goose}.json  # 各平台 MCP 运行时配置源
-│   ├── skills/                           # 5 个 Skill（同步到 .trae/.opencode/.codebuddy）
+│   ├── skills/                           # 5 个 Skill（同步到 .trae/.opencode/.codebuddy/.goose）
 │   └── mindweave-mcp/                    # MCP Server 服务层（Python，内联自包含）
 │       ├── src/mindweave_mcp/            # server.py / models.py / algorithms.py / storage.py / prompts/ / tools/ / web/
 │       ├── tests/                        # 测试套件
 │       ├── data/                         # 运行时数据（被 .gitignore，保留 .gitkeep）
 │       └── pyproject.toml                # 入口 mindweave-mcp / mindweave-web
-├── .trae/ .opencode/ .codebuddy/         # 各平台配置（scripts/sync-agent-configs 生成）
+├── .trae/ .opencode/ .codebuddy/ .goose/ # 各平台配置（scripts/sync-agent-configs 生成）
 └── docs/                                 # 设计文档 / 计划 / 评审（本地文档，不入库追踪）
 ```
 
@@ -141,7 +146,7 @@ MindWeave/
 
 ## Sage 集成
 
-MindWeave 是 Sage 学习三支柱中的第三域（课堂/知识点笔记）。Sage 侧通过 `MindWeaveReader` 只读聚合 `data/notes/*.json`（cues 展平为 due items，due 来源 `cue.review_state.next_review`），`sync_from_plugins` 后可在 `get_profile` 出现 mindweave 域；`.trae/skills/` 投影使 TraeCode `list skills` 可见三插件共 15 技能（deep-review 5 + vocabcraft 5 + mindweave 5）。
+MindWeave 是 Sage 学习三支柱中的第三域（课堂/知识点笔记）。Sage 侧通过 `MindWeaveReader` 只读聚合 `data/notes/*.json`（cues 展平为 due items，due 来源 `cue.review_state.next_review`），`sync_from_plugins` 后可在 `get_profile` 出现 mindweave 域；`.trae/skills/` 投影使 Trae `list skills` 可见三插件共 15 技能（deep-review 5 + vocabcraft 5 + mindweave 5）。
 
 ## 数据安全
 

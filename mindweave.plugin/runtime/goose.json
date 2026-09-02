@@ -1,8 +1,19 @@
 {
-  "mcpServers": {
+  "extensions": {
     "mindweave-mcp": {
-      "command": "uv",
-      "args": ["run", "--no-sync", "--directory", "${workspaceFolder}/mindweave.plugin/mindweave-mcp", "mindweave-mcp"]
+      "name": "mindweave-mcp",
+      "enabled": true,
+      "type": "stdio",
+      "cmd": "uv",
+      "args": [
+        "run",
+        "--no-sync",
+        "--directory",
+        "mindweave.plugin/mindweave-mcp",
+        "mindweave-mcp"
+      ],
+      "timeout": 300,
+      "description": "MindWeave K12 康奈尔笔记 MCP 服务"
     }
   }
 }

@@ -1,6 +1,6 @@
 # MindWeave - K12 康奈尔 AI 智能笔记 Agent Plugin（skills + MCP 一体）
 
-基于 Trae IDE CN / Trae Work CN / CodeBuddy / OpenCode（goose 保留未默认支持，不投影）的 K12 康奈尔 AI 智能笔记解决方案。核心流程：拍照/文字录入 → 宿主 LLM 整理为康奈尔笔记（线索栏/笔记栏/总结栏）→ 用户确认保存 → 线索栏问题即知识卡 → 基于 SM-2 遗忘曲线的复习排程 → 到期遮挡回忆自评（1-4 档）→ 统计/导出。配置统一维护在 `mindweave.plugin/`（AAIF 真相源），通过 `scripts/sync-agent-configs` 单向同步到 `.trae/` / `.opencode/` / `.codebuddy/`。
+基于 Trae / CodeBuddy / OpenCode / Goose（goose 作为 AAIF 标准验证 harness）的 K12 康奈尔 AI 智能笔记解决方案。核心流程：拍照/文字录入 → 宿主 LLM 整理为康奈尔笔记（线索栏/笔记栏/总结栏）→ 用户确认保存 → 线索栏问题即知识卡 → 基于 SM-2 遗忘曲线的复习排程 → 到期遮挡回忆自评（1-4 档）→ 统计/导出。配置统一维护在 `mindweave.plugin/`（AAIF 真相源），通过 `scripts/sync-agent-configs` 单向同步到 `.trae/` / `.opencode/` / `.codebuddy/` / `.goose/`。
 
 > **打包形态**：`mindweave.plugin/` 同时是符合 **Agent Plugins 1.0**（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）规范的 Agent Plugin —— 根目录含 `plugin.json`（manifest）、`mcp.json`（MCP 启动配置）、`skills/`（5 个 Skill），可直接作为标准插件分发到任意兼容客户端。各 harness 原生目录（`.trae/` 等）仍由 `scripts/sync-agent-configs` 单向生成，互不冲突。
 
@@ -9,16 +9,16 @@
 **服务层 + 配置层 + 规则层** 分离：
 
 - **服务层** (`mindweave.plugin/mindweave-mcp/`)：纯 Python MCP Server，通用，不绑定任何客户端，可独立发布；作为子目录内联于插件目录，使插件完全自包含、可整体分发
-- **配置层**：定义 subagent（Skill）行为、流程与约束。`mindweave.plugin/` 为 AAIF 唯一真相源（**只改这里**），`.trae/`、`.opencode/`、`.codebuddy/` 由 `scripts/sync-agent-configs` 单向生成，禁止直接编辑（见「流程规则 > 配置同步」）
+- **配置层**：定义 subagent（Skill）行为、流程与约束。`mindweave.plugin/` 为 AAIF 唯一真相源（**只改这里**），`.trae/`、`.opencode/`、`.codebuddy/`、`.goose/` 由 `scripts/sync-agent-configs` 单向生成，禁止直接编辑（见「流程规则 > 配置同步」）
 - **规则层**（`mindweave.plugin/AGENTS.md`）：业务规则约束笔记采集/整理/复习流程，开发规则约束代码开发流程
 
 ```
 用户交互层
 ├── 对话式交互 (命令 / 自然语言)
-├── 四运行时: Trae IDE CN + Trae Work CN + CodeBuddy + OpenCode（goose 保留未默认支持）
+├── 四运行时: Trae + CodeBuddy + OpenCode + Goose
     ↓
-Skills 编排层 (配置定义，由 mindweave.plugin/skills/ 同步三平台)
-├── mindweave.plugin/skills/mindweave-* （单向同步到 .trae/.opencode/.codebuddy）
+Skills 编排层 (配置定义，由 mindweave.plugin/skills/ 同步四平台)
+├── mindweave.plugin/skills/mindweave-* （单向同步到 .trae/.opencode/.codebuddy/.goose）
 ├── 5 个 Skill: capture / review / quiz / stats / export
     ↓
 服务层 (mindweave_mcp，位于 mindweave.plugin/mindweave-mcp/)
@@ -100,7 +100,7 @@ Not lazy about: input validation at trust boundaries, error handling that preven
 ### 流程规则（单人模式）
 
 - 需求不明先 `brainstorming` 澄清；功能开发遵循 TDD；Bug 根因不明先 `systematic-debugging`；每次 commit 前跑 lint/test/typecheck 拿证据；声称完成必须有验证证据（禁"应该没问题"式声称）；修复循环 > 3 次仍不回退规划阶段。
-- **配置同步（强约束）**：`mindweave.plugin/` 是 AAIF 配置层唯一真相源（runtime 配置在 `mindweave.plugin/runtime/`、Skills 在 `mindweave.plugin/skills/`、规则在 `mindweave.plugin/AGENTS.md`、AAIF 声明在 `mindweave.plugin/tools.json` / `triggers.json` / `workflows.json`、插件契约在 `mindweave.plugin/plugin.json` / `mcp.json`）；`.trae/`、`.opencode/`、`.codebuddy/` 是 `scripts/sync-agent-configs` 的生成产物。**严禁**以任何方式（手工、AI、脚本）直接编辑 `.trae/**`、`.opencode/**`、`.codebuddy/**` 下（`mindweave.plugin/` 之外）的 Skill / MCP / 配置文件——同步脚本是单向覆盖，此类改动会在下次同步时被静默丢弃。正确流程：改 `mindweave.plugin/` → 跑 `scripts/sync-agent-configs.ps1`（或 `.sh`）→ 各生成目录改动一起提交。例外仅限 `.codebuddy/memory/**` 等由运行时自行写入、不参与同步的目录。commit 前自检：若 diff 中出现 `.trae/**`、`.opencode/**`、`.codebuddy/**` 的修改而 `mindweave.plugin/**` 下无对应改动，视为违规，必须回退并从 `mindweave.plugin/` 重做。
+- **配置同步（强约束）**：`mindweave.plugin/` 是 AAIF 配置层唯一真相源（runtime 配置在 `mindweave.plugin/runtime/`、Skills 在 `mindweave.plugin/skills/`、规则在 `mindweave.plugin/AGENTS.md`、AAIF 声明在 `mindweave.plugin/tools.json` / `triggers.json` / `workflows.json`、插件契约在 `mindweave.plugin/plugin.json` / `mcp.json`）；`.trae/`、`.opencode/`、`.codebuddy/`、`.goose/` 是 `scripts/sync-agent-configs` 的生成产物。**严禁**以任何方式（手工、AI、脚本）直接编辑 `.trae/**`、`.opencode/**`、`.codebuddy/**`、`.goose/**` 下（`mindweave.plugin/` 之外）的 Skill / MCP / 配置文件——同步脚本是单向覆盖，此类改动会在下次同步时被静默丢弃。正确流程：改 `mindweave.plugin/` → 跑 `scripts/sync-agent-configs.ps1`（或 `.sh`）→ 各生成目录改动一起提交。例外仅限 `.codebuddy/memory/**` 等由运行时自行写入、不参与同步的目录。commit 前自检：若 diff 中出现 `.trae/**`、`.opencode/**`、`.codebuddy/**`、`.goose/**` 的修改而 `mindweave.plugin/**` 下无对应改动，视为违规，必须回退并从 `mindweave.plugin/` 重做。
 - 分支：main 受 GitHub 保护，禁 force-push、禁 merge commit；功能合并用 `git merge --squash`；小改动可直接 main，大功能建议用 feature 分支。
 - 发布：版本号一致后才推送 main，等 CI 通过再打 Tag；禁止 CI 未过时创建 Tag。
 

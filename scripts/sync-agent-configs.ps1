@@ -2,20 +2,22 @@
 .SYNOPSIS
     同步 mindweave.plugin/ 配置到各平台目录。
 .DESCRIPTION
-    从 mindweave.plugin/runtime/ 目录读取配置，生成 .trae/、.opencode/、.codebuddy/ 配置。
+    从 mindweave.plugin/runtime/ 目录读取配置，生成 .trae/、.opencode/、.codebuddy/、.goose/ 配置。
     mindweave.plugin/ 是 AAIF 标准的唯一配置源。
-    （goose 未默认支持，故不生成 .goose/ 投影。）
 .PARAMETER SkipTrae
     跳过 Trae 配置生成。
 .PARAMETER SkipOpencode
     跳过 opencode 配置生成。
 .PARAMETER SkipCodebuddy
     跳过 CodeBuddy 配置生成。
+.PARAMETER SkipGoose
+    跳过 Goose 配置生成。
 #>
 param(
     [switch]$SkipTrae,
     [switch]$SkipOpencode,
-    [switch]$SkipCodebuddy
+    [switch]$SkipCodebuddy,
+    [switch]$SkipGoose
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,6 +99,19 @@ function New-AaifDeclarations {
     Write-Host "  已生成 tools.json / triggers.json / workflows.json" -ForegroundColor Green
 }
 
+function New-GooseConfig {
+    $GooseDir = Join-Path $ProjectRoot ".goose"
+    if (-not (Test-Path $GooseDir)) { New-Item -ItemType Directory -Path $GooseDir -Force | Out-Null }
+    Write-Host "同步 Skills / AGENTS.md → $GooseDir" -ForegroundColor Yellow
+    Sync-Skills -TargetDir $GooseDir
+    Sync-AgentsMd -TargetDir $GooseDir
+    $GenScript = Join-Path $PSScriptRoot "generate-goose-config.py"
+    Write-Host "生成 Goose 配置 → .goose/config.yaml" -ForegroundColor Yellow
+    uv run --no-sync python $GenScript
+    if ($LASTEXITCODE -ne 0) { Write-Error "Goose 配置生成失败"; exit 1 }
+    Write-Host "  已生成 .goose/config.yaml" -ForegroundColor Green
+}
+
 New-AaifDeclarations
 
 if (-not $SkipTrae) {
@@ -116,5 +131,9 @@ if (-not $SkipCodebuddy) {
     Sync-Skills -TargetDir (Join-Path $ProjectRoot ".codebuddy")
     Sync-AgentsMd -TargetDir (Join-Path $ProjectRoot ".codebuddy")
     New-CodebuddyConfig
+}
+if (-not $SkipGoose) {
+    Write-Host "`n--- Goose ---" -ForegroundColor Cyan
+    New-GooseConfig
 }
 Write-Host "`n=== 同步完成 ===" -ForegroundColor Cyan
