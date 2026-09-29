@@ -6,7 +6,8 @@
 校验项：
     1. CHANGELOG.md 最新条目版本
     2. 清单类文件：根 package.json / plugin.json（主 + CodeBuddy 副本）/ 两个 marketplace.json / tools.json
-    3. （可选 --tag）发布 tag 与真相源一致，防止打错 tag
+    3. 源码硬编码版本：web/app.py 的 FastAPI version
+    4. （可选 --tag）发布 tag 与真相源一致，防止打错 tag
 
 MindWeave 不在 `__init__.py` 硬编码版本（AGENTS.md 文档规则未要求），也不在文档中嵌入
 版本化发行包名，故仅校验 CHANGELOG 与清单类文件，避免误报。
@@ -37,6 +38,12 @@ MANIFEST_VERSIONS: list[tuple[str, tuple[str | int, ...]]] = [
     (".codebuddy-plugin/marketplace.json", ("plugins", 0, "version")),
     ("marketplace.json", ("plugins", 0, "version")),
     ("mindweave.plugin/tools.json", ("version",)),
+]
+
+# 源码内硬编码版本（非 JSON，按文本模式匹配）：web 应用对外暴露的版本号，
+# 曾长期停留在 0.2.0 而未被任何校验覆盖
+SOURCE_VERSIONS: list[tuple[str, str]] = [
+    ("mindweave.plugin/mindweave-mcp/src/mindweave_mcp/web/app.py", r'version\s*=\s*"(\d+\.\d+\.\d+)"'),
 ]
 
 
@@ -70,6 +77,22 @@ def scan_manifests(expected: str) -> list[str]:
     return problems
 
 
+def scan_sources(expected: str) -> list[str]:
+    """校验源码中硬编码的版本号，返回不一致项描述"""
+    problems: list[str] = []
+    for rel, pattern in SOURCE_VERSIONS:
+        path = ROOT / rel
+        if not path.exists():
+            problems.append(f"{rel}: 文件不存在")
+            continue
+        m = re.search(pattern, path.read_text(encoding="utf-8"))
+        if not m:
+            problems.append(f"{rel}: 未找到版本号赋值")
+        elif m.group(1) != expected:
+            problems.append(f"{rel}: 硬编码版本为 {m.group(1)}，应为 {expected}")
+    return problems
+
+
 def source_version() -> str:
     """从 pyproject.toml 读取真相源版本"""
     with PYPROJECT.open("rb") as f:
@@ -89,7 +112,7 @@ def main() -> int:
     args = parser.parse_args()
 
     expected = source_version()
-    problems = scan_manifests(expected)
+    problems = scan_manifests(expected) + scan_sources(expected)
 
     changelog = changelog_version()
     if changelog is None:

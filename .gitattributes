@@ -1,0 +1,5 @@
+# 强制 LF 行尾：git pre-commit 钩子与 .sh 脚本由 sh 解释器执行，
+# CRLF 会导致 shebang("#!/bin/sh\r")与解析失败（I4 修复）
+scripts/pre-commit text eol=lf
+scripts/*.sh text eol=lf
+*.ps1 text eol=crlf

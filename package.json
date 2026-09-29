@@ -6,6 +6,7 @@
   "scripts": {
     "generate-declarations": "uv run --no-sync --directory mindweave.plugin/mindweave-mcp python ../../scripts/generate-aaif-declarations.py",
     "sync-configs": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-agent-configs.ps1",
+    "check-drift": "bash scripts/check-config-drift.sh",
     "publish": "agents publish mindweave.plugin"
   },
   "keywords": ["aaif", "agent", "note", "cornell", "learning", "mcp"],

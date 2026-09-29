@@ -5,3 +5,6 @@ docs/
 .uv-cache/
 .venv/
 __pycache__/
+
+# 构建产物（scripts/build-release.sh/.ps1 输出）
+dist/

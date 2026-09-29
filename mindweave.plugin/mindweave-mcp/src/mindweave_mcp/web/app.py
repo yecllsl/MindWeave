@@ -26,7 +26,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="MindWeave 可视化",
         description="K12 康奈尔笔记本地人工处理面（浏览/编辑/删除/自评复习/统计）",
-        version="0.2.0",
+        version="0.3.2",
     )
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 

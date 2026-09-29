@@ -1,6 +1,122 @@
-#!/usr/bin/env bash
-# scripts/pre-commit — 提交前快速门禁（ruff + pytest）
-set -e
-cd mindweave.plugin/mindweave-mcp
-uv run ruff check src tests
-uv run pytest -q
+#!/bin/sh
+# scripts/pre-commit — 配置同步强约束的机械防线
+#
+# 原则（见 mindweave.plugin/AGENTS.md「流程规则 > 配置同步」）：
+#   mindweave.plugin/ 是配置层唯一真相源；.trae/、.opencode/
+#   由 scripts/sync-agent-configs(.ps1/.sh) 单向生成，禁止直接编辑。
+#
+# 本钩子采用「内容一致性」校验，而非旧的『本次提交是否同时含 mindweave.plugin 改动』：
+#   1. Tier 2 平台（.trae / .opencode）生成的 skills/** 与 AGENTS.md 必须与其
+#      mindweave.plugin/ 源逐字节一致
+#      （Trae 平台额外校验根 AGENTS.md——Trae 读取项目根 AGENTS.md，由同步脚本从
+#      mindweave.plugin/AGENTS.md 复制而来）。
+#      不一致即拒绝，从而同时拦截三种违规：
+#         a) 直接改生成目录（副本 ≠ 源）
+#         b) 只改 mindweave.plugin 但忘跑同步（副本 = 旧源，与本次暂存的新源不一致）
+#         c) 合法补跑同步（副本 == 源，放行，不再误拦）
+#   2. 非纯复制产物（各平台 mcp.json / opencode.json / config.yaml /
+#      .ignore / skill-config.json / memory 等）不做强制比对予以豁免：
+#      它们含平台差异化或本机绝对路径（如各平台 mcp.json），
+#      逐字节比对会引入误拦。
+#
+# 紧急绕过（不推荐，会破坏单一真相源）：git commit --no-verify
+#
+# 注：CodeBuddy / VS Code 走 Tier 1 插件通道（mindweave.plugin/ Agent Plugins 1.0 包），
+# 不再生成 .codebuddy/ 原生目录；.codebuddy/ 仅存放运行时自有数据（memory 等），不校验。
+
+set -eu
+
+# 用 git 目录下的固定临时文件（git 仓库必可写），避免依赖 mktemp 的 /tmp 权限
+tmp=".git/pre-commit.$$"
+trap 'rm -f "$tmp"' EXIT
+git diff --cached --name-only --diff-filter=AMD > "$tmp"
+
+# 取暂存区内容；若未暂存则取磁盘当前内容
+staged_rel() { git show ":$1" 2>/dev/null || cat "$1"; }
+
+# 生成文件 → mindweave.plugin 源（仅 skills/** 与 AGENTS.md 两类纯复制产物）
+gen_to_src() {
+    case "$1" in
+        .trae/skills/*)      printf 'mindweave.plugin/skills/%s\n' "${1#.trae/skills/}" ;;
+        .opencode/skills/*)  printf 'mindweave.plugin/skills/%s\n' "${1#.opencode/skills/}" ;;
+        AGENTS.md|.trae/AGENTS.md|.opencode/AGENTS.md)
+            printf 'mindweave.plugin/AGENTS.md\n' ;;
+    esac
+}
+
+# 判断生成文件是否属于纯复制产物（需强校验；根 AGENTS.md 是 Trae 的复制产物）
+is_generated_copy() {
+    case "$1" in
+        .trae/skills/*|.opencode/skills/*|.opencode/AGENTS.md) return 0 ;;
+        AGENTS.md) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+violations=0
+
+# `|| [ -n "$f" ]` 规避 set -e 下 while-read 空输入的陷阱（空文件时 read 返回非0，
+# 若无此回退，set -e 会在循环处提前退出，误判为违规）
+while IFS= read -r f || [ -n "$f" ]; do
+    if [ -z "$f" ]; then
+        continue
+    fi
+
+    # ── 反向：mindweave.plugin 纯复制源在暂存区 → 校验副本一致 ──
+    case "$f" in
+        mindweave.plugin/skills/*|mindweave.plugin/AGENTS.md)
+            case "$f" in
+                mindweave.plugin/AGENTS.md)
+                    # Trae 读项目根 AGENTS.md，故需额外比对根副本
+                    for copy in AGENTS.md .opencode/AGENTS.md; do
+                        if [ ! -f "$copy" ]; then
+                            continue
+                        fi
+                        if [ "$(staged_rel "$f")" != "$(staged_rel "$copy")" ]; then
+                            echo "pre-commit: 检测到 $f 已修改但未同步到 $copy" >&2
+                            echo "  请先运行 scripts/sync-agent-configs.ps1（或 .sh），再将 $copy 一并提交" >&2
+                            violations=$((violations + 1))
+                        fi
+                    done
+                    ;;
+                *)
+                    for p in .trae .opencode; do
+                        copy="$p${f#mindweave.plugin}"    # mindweave.plugin/skills/x → $p/skills/x（POSIX 前缀剔除，兼容 dash）
+                        if [ ! -f "$copy" ]; then
+                            continue    # 该平台无此文件则跳过（不强制全平台同步）
+                        fi
+                        if [ "$(staged_rel "$f")" != "$(staged_rel "$copy")" ]; then
+                            echo "pre-commit: 检测到 $f 已修改但未同步到 $p" >&2
+                            echo "  请先运行 scripts/sync-agent-configs.ps1（或 .sh），再将 $copy 一并提交" >&2
+                            violations=$((violations + 1))
+                        fi
+                    done
+                    ;;
+            esac
+            ;;
+    esac
+
+    # ── 正向：生成目录的纯复制产物在暂存区 → 必须与源一致 ──
+    case "$f" in
+        .trae/*|.opencode/*)
+            if is_generated_copy "$f"; then
+                src=$(gen_to_src "$f")
+                if [ "$(staged_rel "$f")" != "$(staged_rel "$src")" ]; then
+                    echo "pre-commit: 拒绝提交 — $f 与真相源 $src 不一致" >&2
+                    echo "  生成目录由同步脚本单向覆盖，请勿直接编辑" >&2
+                    echo "  正确流程：改 $src → 跑 scripts/sync-agent-configs → 一起提交" >&2
+                    violations=$((violations + 1))
+                fi
+            fi
+            # 非纯复制产物（mcp.json 等）豁免，不做强制比对
+            ;;
+    esac
+done < "$tmp"
+
+if [ "$violations" -gt 0 ]; then
+    echo "" >&2
+    echo "紧急绕过（不推荐，会破坏单一真相源）：git commit --no-verify" >&2
+    exit 1
+fi
+
+exit 0
