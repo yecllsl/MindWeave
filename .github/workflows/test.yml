@@ -100,7 +100,7 @@ jobs:
         uv run bandit -r src -c pyproject.toml
 
   # ──────────────────────────────────────────
-  # 配置漂移检查：四平台生成目录必须与 mindweave.plugin 真相源一致
+  # 配置漂移检查：Tier 2 平台生成目录必须与 mindweave.plugin 真相源一致
   # 作为 pre-commit 钩子的 CI 兜底（防止绕过钩子 push 时漂移悄悄进仓库）
   # ──────────────────────────────────────────
   config-drift:
@@ -114,3 +114,7 @@ jobs:
     - name: Check AAIF config drift
       run: |
         sh scripts/check-config-drift.sh
+
+    - name: Check version consistency
+      run: |
+        python scripts/check_version.py

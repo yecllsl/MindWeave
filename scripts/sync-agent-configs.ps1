@@ -1,139 +1,115 @@
-<#
-.SYNOPSIS
-    同步 mindweave.plugin/ 配置到各平台目录。
-.DESCRIPTION
-    从 mindweave.plugin/runtime/ 目录读取配置，生成 .trae/、.opencode/、.codebuddy/、.goose/ 配置。
-    mindweave.plugin/ 是 AAIF 标准的唯一配置源。
-.PARAMETER SkipTrae
-    跳过 Trae 配置生成。
-.PARAMETER SkipOpencode
-    跳过 opencode 配置生成。
-.PARAMETER SkipCodebuddy
-    跳过 CodeBuddy 配置生成。
-.PARAMETER SkipGoose
-    跳过 Goose 配置生成。
-#>
+#!/usr/bin/env pwsh
+# 将 mindweave.plugin/ (配置真相源 + Agent Plugins 1.0 插件包) 单向同步到 Tier 2 原生 harness 项目目录:
+#   .trae/  .opencode/
+#
+# 注：CodeBuddy 与 VS Code 走 Tier 1 插件通道（mindweave.plugin/ 即 Agent Plugins 1.0 包，
+#      经 .codebuddy-plugin/marketplace.json 本地市场安装），不再生成 .codebuddy/ 原生目录。
+#
+# 用法:
+#   ./scripts/sync-agent-configs.ps1                 # 同步全部 (Tier 2: .trae + .opencode)
+#   ./scripts/sync-agent-configs.ps1 -SkipTrae       # 跳过 Trae
+[CmdletBinding()]
 param(
     [switch]$SkipTrae,
-    [switch]$SkipOpencode,
-    [switch]$SkipCodebuddy,
-    [switch]$SkipGoose
+    [switch]$SkipOpencode
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
+
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
+$PluginDir = Join-Path $ProjectRoot 'mindweave.plugin'
+$PluginRuntime = Join-Path $PluginDir 'runtime'
+$PluginSkills = Join-Path $PluginDir 'skills'
+$PluginMd = Join-Path $PluginDir 'AGENTS.md'
+$McpDir = Join-Path $PluginDir 'mindweave-mcp'
 
-$AgentsDir = Join-Path $ProjectRoot "mindweave.plugin"
-$AgentsRuntime = Join-Path $AgentsDir "runtime"
-$AgentsSkills = Join-Path $AgentsDir "skills"
-$AgentsMd = Join-Path $AgentsDir "AGENTS.md"
+$Green = "$([char]0x1b)[32m"
+$Yellow = "$([char]0x1b)[33m"
+$Cyan = "$([char]0x1b)[36m"
+$Red = "$([char]0x1b)[31m"
+$NC = "$([char]0x1b)[0m"
 
-if (-not (Test-Path $AgentsRuntime)) { Write-Error "AAIF 运行时配置目录不存在: $AgentsRuntime"; exit 1 }
-if (-not (Test-Path $AgentsSkills)) { Write-Error "AAIF 技能目录不存在: $AgentsSkills"; exit 1 }
-if (-not (Test-Path $AgentsMd)) { Write-Error "AGENTS.md 不存在: $AgentsMd"; exit 1 }
+if (-not (Test-Path $PluginRuntime)) { throw "错误: 运行时配置目录不存在: $PluginRuntime" }
+if (-not (Test-Path $PluginSkills)) { throw "错误: 技能目录不存在: $PluginSkills" }
+if (-not (Test-Path $PluginMd)) { throw "错误: AGENTS.md 不存在: $PluginMd" }
 
-Write-Host "=== MindWeave AAIF Config Sync ===" -ForegroundColor Cyan
+Write-Host "$Cyan=== MindWeave AAIF Config Sync ===$NC"
 Write-Host "项目根目录: $ProjectRoot"
-Write-Host "配置源: mindweave.plugin/ (AAIF 标准)"
+Write-Host "配置源: mindweave.plugin/ (AAIF 标准 + Agent Plugins 1.0)"
+
+# ── 先重新生成 AAIF 声明文件（tools/triggers/workflows.json）──
+function Invoke-AaifDeclarations {
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        Write-Host "$Red未找到 uv，无法生成 AAIF 声明文件 (tools.json/triggers.json/workflows.json)$NC" -ForegroundColor Red
+        throw "uv not found"
+    }
+    $script = Join-Path $PSScriptRoot 'generate-aaif-declarations.py'
+    Write-Host "$Yellow生成 AAIF 声明文件 → mindweave.plugin/$NC"
+    Push-Location $ProjectRoot
+    try {
+        & uv run --no-sync --directory $McpDir python $script
+        if ($LASTEXITCODE -ne 0) { throw "AAIF 声明文件生成失败 (exit=$LASTEXITCODE)" }
+    } finally {
+        Pop-Location
+    }
+    Write-Host "$Green  已生成 tools.json / triggers.json / workflows.json$NC"
+}
 
 function Sync-Skills {
     param([string]$TargetDir)
-    $null = New-Item -ItemType Directory -Path $TargetDir -Force
-    $TargetSkills = Join-Path $TargetDir "skills"
-    if (Test-Path $TargetSkills) { Remove-Item -Recurse -Force $TargetSkills }
-    Write-Host "同步 Skills → $TargetSkills" -ForegroundColor Yellow
-    Copy-Item -Recurse -Force $AgentsSkills $TargetSkills
-    $SkillCount = (Get-ChildItem -Path $TargetSkills -Directory).Count
-    Write-Host "  已同步 $SkillCount 个 Skills" -ForegroundColor Green
+    $targetSkills = Join-Path $TargetDir 'skills'
+    New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
+    if (Test-Path $targetSkills) { Remove-Item -Recurse -Force $targetSkills }
+    Write-Host "$Yellow同步 Skills → $targetSkills$NC"
+    Copy-Item -Recurse $PluginSkills $targetSkills
+    $count = (Get-ChildItem $targetSkills -Directory).Count
+    Write-Host "$Green  已同步 $count 个 Skills$NC"
 }
 
 function Sync-AgentsMd {
     param([string]$TargetDir)
-    $TargetAgentsMd = Join-Path $TargetDir "AGENTS.md"
-    Write-Host "同步 AGENTS.md → $TargetAgentsMd" -ForegroundColor Yellow
-    Copy-Item -Force $AgentsMd $TargetAgentsMd
-    Write-Host "  已同步 AGENTS.md" -ForegroundColor Green
+    $targetMd = Join-Path $TargetDir 'AGENTS.md'
+    Write-Host "$Yellow同步 AGENTS.md → $targetMd$NC"
+    Copy-Item -Force $PluginMd $targetMd
+    Write-Host "$Green  已同步 AGENTS.md$NC"
 }
 
-function New-TraeConfig {
-    $TraeDir = Join-Path $ProjectRoot ".trae"
-    if (-not (Test-Path $TraeDir)) { New-Item -ItemType Directory -Path $TraeDir -Force | Out-Null }
-    $SourceConfig = Join-Path $AgentsRuntime "trae.json"
-    if (Test-Path $SourceConfig) {
-        Write-Host "复制 Trae 配置 → $TraeDir" -ForegroundColor Yellow
-        Copy-Item -Force $SourceConfig (Join-Path $TraeDir "mcp.json")
-        Write-Host "  已生成 Trae 配置" -ForegroundColor Green
+function Generate-TraeConfig {
+    $traeDir = Join-Path $ProjectRoot '.trae'
+    New-Item -ItemType Directory -Force -Path $traeDir | Out-Null
+    $source = Join-Path $PluginRuntime 'trae.json'
+    if (Test-Path $source) {
+        Write-Host "$Yellow复制 Trae 配置 → .trae/$NC"
+        Copy-Item -Force $source (Join-Path $traeDir 'mcp.json')
+        Write-Host "$Green  已生成 Trae 配置$NC"
     }
 }
 
-function New-OpencodeConfig {
-    $OpencodeDir = Join-Path $ProjectRoot ".opencode"
-    if (-not (Test-Path $OpencodeDir)) { New-Item -ItemType Directory -Path $OpencodeDir -Force | Out-Null }
-    $SourceConfig = Join-Path $AgentsRuntime "opencode.json"
-    if (Test-Path $SourceConfig) {
-        Write-Host "复制 opencode 配置 → $OpencodeDir" -ForegroundColor Yellow
-        Copy-Item -Force $SourceConfig (Join-Path $OpencodeDir "opencode.json")
-        Write-Host "  已生成 opencode 配置" -ForegroundColor Green
+function Generate-OpencodeConfig {
+    $opencodeDir = Join-Path $ProjectRoot '.opencode'
+    New-Item -ItemType Directory -Force -Path $opencodeDir | Out-Null
+    $source = Join-Path $PluginRuntime 'opencode.json'
+    if (Test-Path $source) {
+        Write-Host "$Yellow复制 opencode 配置 → .opencode/$NC"
+        Copy-Item -Force $source (Join-Path $opencodeDir 'opencode.json')
+        Write-Host "$Green  已生成 opencode 配置$NC"
     }
 }
 
-function New-CodebuddyConfig {
-    $CodebuddyDir = Join-Path $ProjectRoot ".codebuddy"
-    if (-not (Test-Path $CodebuddyDir)) { New-Item -ItemType Directory -Path $CodebuddyDir -Force | Out-Null }
-    $SourceConfig = Join-Path $AgentsRuntime "codebuddy.json"
-    if (Test-Path $SourceConfig) {
-        Write-Host "复制 CodeBuddy 配置 → $CodebuddyDir" -ForegroundColor Yellow
-        Copy-Item -Force $SourceConfig (Join-Path $CodebuddyDir "mcp.json")
-        Write-Host "  已生成 CodeBuddy 配置" -ForegroundColor Green
-    }
-}
-
-function New-AaifDeclarations {
-    $Uv = Get-Command uv -ErrorAction SilentlyContinue
-    if (-not $Uv) { Write-Error "未找到 uv，无法生成 AAIF 声明文件（tools.json/triggers.json/workflows.json）"; exit 1 }
-    $DeclScript = Join-Path $PSScriptRoot "generate-aaif-declarations.py"
-    $McpDir = Join-Path (Join-Path $ProjectRoot "mindweave.plugin") "mindweave-mcp"
-    Write-Host "生成 AAIF 声明文件 → mindweave.plugin/" -ForegroundColor Yellow
-    uv run --no-sync --directory $McpDir python $DeclScript
-    if ($LASTEXITCODE -ne 0) { Write-Error "AAIF 声明文件生成失败"; exit 1 }
-    Write-Host "  已生成 tools.json / triggers.json / workflows.json" -ForegroundColor Green
-}
-
-function New-GooseConfig {
-    $GooseDir = Join-Path $ProjectRoot ".goose"
-    if (-not (Test-Path $GooseDir)) { New-Item -ItemType Directory -Path $GooseDir -Force | Out-Null }
-    Write-Host "同步 Skills / AGENTS.md → $GooseDir" -ForegroundColor Yellow
-    Sync-Skills -TargetDir $GooseDir
-    Sync-AgentsMd -TargetDir $GooseDir
-    $GenScript = Join-Path $PSScriptRoot "generate-goose-config.py"
-    Write-Host "生成 Goose 配置 → .goose/config.yaml" -ForegroundColor Yellow
-    uv run --no-sync python $GenScript
-    if ($LASTEXITCODE -ne 0) { Write-Error "Goose 配置生成失败"; exit 1 }
-    Write-Host "  已生成 .goose/config.yaml" -ForegroundColor Green
-}
-
-New-AaifDeclarations
+# ── 主流程 ──
+Invoke-AaifDeclarations
 
 if (-not $SkipTrae) {
-    Write-Host "`n--- Trae ---" -ForegroundColor Cyan
-    Sync-Skills -TargetDir (Join-Path $ProjectRoot ".trae")
-    Sync-AgentsMd -TargetDir $ProjectRoot
-    New-TraeConfig
+    Write-Host "`n$Cyan--- Trae ---$NC"
+    Sync-Skills (Join-Path $ProjectRoot '.trae')
+    Sync-AgentsMd $ProjectRoot   # Trae 读取项目根 AGENTS.md
+    Generate-TraeConfig
 }
 if (-not $SkipOpencode) {
-    Write-Host "`n--- opencode ---" -ForegroundColor Cyan
-    Sync-Skills -TargetDir (Join-Path $ProjectRoot ".opencode")
-    Sync-AgentsMd -TargetDir (Join-Path $ProjectRoot ".opencode")
-    New-OpencodeConfig
+    Write-Host "`n$Cyan--- opencode ---$NC"
+    Sync-Skills (Join-Path $ProjectRoot '.opencode')
+    Sync-AgentsMd (Join-Path $ProjectRoot '.opencode')
+    Generate-OpencodeConfig
 }
-if (-not $SkipCodebuddy) {
-    Write-Host "`n--- CodeBuddy ---" -ForegroundColor Cyan
-    Sync-Skills -TargetDir (Join-Path $ProjectRoot ".codebuddy")
-    Sync-AgentsMd -TargetDir (Join-Path $ProjectRoot ".codebuddy")
-    New-CodebuddyConfig
-}
-if (-not $SkipGoose) {
-    Write-Host "`n--- Goose ---" -ForegroundColor Cyan
-    New-GooseConfig
-}
-Write-Host "`n=== 同步完成 ===" -ForegroundColor Cyan
+
+Write-Host "`n$Cyan=== 同步完成 ===$NC"

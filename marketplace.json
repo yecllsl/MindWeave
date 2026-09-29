@@ -1,0 +1,16 @@
+{
+  "name": "mindweave-local-market",
+  "description": "MindWeave 插件市场（单插件，供 VS Code / Copilot CLI 经 Agent Plugins 1.0 远程市场安装；source 指向 ./mindweave.plugin）",
+  "owner": {
+    "name": "yecll"
+  },
+  "plugins": [
+    {
+      "name": "mindweave",
+      "description": "MindWeave K12 康奈尔 AI 智能笔记 Agent Plugin：拍照/文字录入 → 康奈尔整理 → SM-2 复习排程 → 自评 → 统计导出。",
+      "version": "0.3.2",
+      "source": "./mindweave.plugin",
+      "license": "MIT"
+    }
+  ]
+}

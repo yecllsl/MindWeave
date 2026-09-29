@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-09-29
+
+### Added
+
+- **仓库根 `marketplace.json`（VS Code / Copilot 远程市场）**：新增 Claude Code / Copilot CLI 同源市场格式清单，插件条目 `source` 指向 `./mindweave.plugin`，使 VS Code 经 `chat.plugins.marketplaces: ["yecllsl/MindWeave"]` 远程市场安装 MindWeave 走通（VS Code 的 Install from Source 要求 `plugin.json` 在仓库根，本仓库插件在子目录，故不能用仓库根/子目录 URL 直装）；`scripts/check_version.py` 已纳入该清单的版本守卫
+- **`scripts/check_version.py` 版本一致性校验**：以 `pyproject.toml` 为真相源，覆盖 CHANGELOG 与各插件/市场/AAIF 声明清单的版本一致性，并接入 CI config-drift job
+- **CodeBuddy 本地插件市场通道**：新建根级 `.codebuddy-plugin/marketplace.json`（市场 `mindweave-local-market`，单插件）；`mindweave.plugin/.codebuddy-plugin/plugin.json` 补 `mcpServers` 指向可移植 `.mcp.json`（`${CODEBUDDY_PLUGIN_ROOT}` + `uv` 入口，替换原硬编码绝对路径版）
+
+### Changed
+
+- **两层 Harness 策略写入真相源与文档**：Tier 1 — Agent Plugins 1.0 插件标准（代表 VS Code / Copilot，插件形态分发，规范不携带 AGENTS.md）；Tier 2 — 免费额度 / 开箱即用（Trae、OpenCode 原生目录 + 同步脚本）；明确不支持 WorkBuddy / Hermes / Goose
+- **术语清理**：「AAIF 真相源 / AAIF 配置层 / AAIF 插件包」等混写统一为「配置唯一真相源」，打包标准统一表述为 Agent Plugins 1.0（AAIF 作为基金会/单项标准的表述保留）
+- **MCP 启动去掉 `--no-sync`**：`mindweave.plugin/mcp.json`（Tier 1 插件包）恢复 `uv run` 默认同步行为，插件首启自动构建虚拟环境（Git URL 远程安装场景必需）；Tier 2 的 `.trae/` / `.opencode/` 运行时配置仍保留 `--no-sync`
+- **文档层级标注与基线对齐**：README 架构图/技术栈/「支持的 Harness」表、插件 `AGENTS.md` 架构图与生成的根 `AGENTS.md` 统一将 CodeBuddy 表述为 Tier 1 市场通道，不再写作 Tier 2 / 单向同步目标
+
+### Removed
+
+- **Goose 支持**：`.goose/` 目录、`runtime/goose.json`、`scripts/generate-goose-config.py`、sync 的 Goose 分支、check-config-drift 校验项、文档全部引用（历史条目保留）
+- **CodeBuddy 原生配置目录**：`.codebuddy/`（AGENTS.md、mcp.json、5 个 Skill）全部删除，仅保留运行时自有数据（memory 等），不再参与同步与漂移校验
+
 ## [0.2.0] - 2026-08-30
 
 ### 新增

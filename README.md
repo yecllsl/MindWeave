@@ -1,10 +1,16 @@
 # MindWeave - K12 康奈尔 AI 智能笔记 Agent Plugin（skills + MCP 一体）
 
-K12 康奈尔 AI 智能笔记一体化解决方案，支持 **Trae**、**CodeBuddy**、**OpenCode**、**Goose**（goose 作为 AAIF 标准验证 harness）。核心流程：拍照/文字录入 → 宿主 LLM 整理为康奈尔笔记（线索栏/笔记栏/总结栏）→ 用户确认保存 → 线索栏问题即知识卡 → 基于 SM-2 遗忘曲线的复习排程 → 到期遮挡回忆自评（1-4 档）→ 统计/导出。
+K12 康奈尔 AI 智能笔记一体化解决方案。核心流程：拍照/文字录入 → 宿主 LLM 整理为康奈尔笔记（线索栏/笔记栏/总结栏）→ 用户确认保存 → 线索栏问题即知识卡 → 基于 SM-2 遗忘曲线的复习排程 → 到期遮挡回忆自评（1-4 档）→ 统计/导出。
 
 设计理念：康奈尔笔记法的**线索栏（Cue Column）天然就是复习卡的正面**——「整理笔记」与「生成复习卡」是同一动作，无需两套实体流程（RemNote 模式，笔记即学习材料闭环）。
 
-项目以 **Agent Plugins 1.0**（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）规范打包：`mindweave.plugin/` 即为插件根，含 `plugin.json`（manifest）、`mcp.json`（MCP 启动配置）与 `skills/`（5 个 Skill），可作为标准 Agent Plugin 分发到任意兼容客户端；各 harness 原生目录（`.trae/` 等）仍由 `scripts/sync-agent-configs` 单向生成，互不冲突。
+**支持的 Harness 只有两层**（判定标准：是否采纳 Agent Plugins 1.0 插件标准 / 是否免费额度可开箱即用）：
+
+- **Tier 1 — Agent Plugins 1.0 插件标准（插件形态分发）**：代表 **VS Code / Copilot 与 CodeBuddy**。交付物是 `mindweave.plugin/` 这个自包含插件目录（`plugin.json` + `mcp.json` + `skills/`），任何采纳 Agent Plugins 1.0 的客户端可直接指向它；CodeBuddy 另经本地插件市场通道（仓库根 `.codebuddy-plugin/marketplace.json`，CodeBuddy 自有格式，非 Agent Plugins 1.0，其 `source` 即指向 `./mindweave.plugin`）一键安装；**VS Code / Copilot 经 Agent Plugins 1.0 远程市场安装：仓库根 `marketplace.json`（Claude Code / Copilot CLI 同源市场格式，其 `source` 亦指向 `./mindweave.plugin`）加入 `chat.plugins.marketplaces` 后 Browse Marketplace 安装——插件刻意收纳于 `mindweave.plugin/` 子目录（而非仓库根），故 VS Code 不能用仓库根/子目录 URL 直装，须走市场间接层，请勿为此把插件移到仓库根（会破坏 SSOT 与单向同步）**。该规范不携带 AGENTS.md / rules 文件，规则文件走仓库根 `AGENTS.md`。**不为单个客户端新增同步目标**。
+- **Tier 2 — 免费额度 / 开箱即用（原生目录）**：**Trae、OpenCode**。交付物是 `.trae/` / `.opencode/` 原生配置目录，由 `scripts/sync-agent-configs` 从 `mindweave.plugin/` 单向生成，与 Tier 1 插件包互不冲突。
+- **明确不支持**：**WorkBuddy、Hermes**（用户级 harness，配置只能写 `~/`，无法项目级统一）与 **Goose**（未采纳 Agent Plugins 1.0，已彻底移除支持）；其余未采纳两层标准之一的 harness 一律不尝试。新增任何 harness 前必须先归入上述两层之一，否则不加。
+
+> **打包形态**：`mindweave.plugin/` 同时是符合 **Agent Plugins 1.0**（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）规范的 Agent Plugin —— 根目录含 `plugin.json`（manifest）、`mcp.json`（MCP 启动配置）、`skills/`（5 个 Skill），可直接作为标准插件分发到任意兼容客户端。Tier 2 各 harness 原生目录（`.trae/` / `.opencode/`）仍由 `scripts/sync-agent-configs` 单向生成，与 Tier 1 插件包互不冲突。
 
 ## 核心功能
 
@@ -23,7 +29,7 @@ K12 康奈尔 AI 智能笔记一体化解决方案，支持 **Trae**、**CodeBud
 ```
 用户交互层
 ├── 对话式交互 (命令 / 自然语言)
-├── 四运行时: Trae + CodeBuddy + OpenCode + Goose
+├── 两层 Harness: Tier 1 (Agent Plugins 1.0: VS Code/Copilot + CodeBuddy) + Tier 2 (Trae + OpenCode)
     ↓
 Skills 编排层 (mindweave.plugin/skills/mindweave-*: capture / review / quiz / stats / export)
     ↓
@@ -45,6 +51,7 @@ Rules 约束层 (mindweave.plugin/AGENTS.md — 统一规则源)
 - **数据存储**: JSON 文件（本地存储，原子写入）
 - **包管理**: uv
 - **测试**: pytest + pytest-asyncio + pytest-cov
+- **插件规范**: Agent Plugins 1.0（Vercel 等厂商中立打包规范，与 AAIF 无隶属关系）
 
 ## 快速开始
 
@@ -52,9 +59,33 @@ Rules 约束层 (mindweave.plugin/AGENTS.md — 统一规则源)
 
 - Python 3.12+
 - [uv 包管理器](https://docs.astral.sh/uv/)（Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`）
-- Trae、CodeBuddy、OpenCode 或 Goose（任选其一）
+- 任选以下运行时之一：
+  - **Tier 1（插件形态）**：VS Code / Copilot、CodeBuddy
+  - **Tier 2（原生目录）**：Trae、OpenCode
 
-### 安装（同步配置 + 生成声明）
+### 安装
+
+#### Tier 1 — VS Code / Copilot（Agent Plugins 1.0 远程市场）
+
+1. 用 VS Code 打开本仓库（或任意含 `mindweave.plugin/` 的工作区）
+2. 将仓库根 `marketplace.json` 加入市场：在 `settings.json` 添加
+   ```json
+   "chat.plugins.marketplaces": ["yecllsl/MindWeave"]
+   ```
+3. 打开 Agent 面板 → Browse Marketplace → 安装 `mindweave`
+4. 插件根即 `mindweave.plugin/`（`plugin.json` + `mcp.json` + `skills/`）
+
+> 说明：本仓库插件刻意收纳于 `mindweave.plugin/` 子目录（而非仓库根），VS Code 的 Install from Source 要求 `plugin.json` 在仓库根，故不能用仓库根/子目录 URL 直装；须走 `marketplace.json` 远程市场间接层。请勿为远程市场把插件移到仓库根（会破坏 SSOT 与单向同步）。
+
+#### Tier 1 — CodeBuddy（本地插件市场）
+
+1. 用 CodeBuddy 打开本仓库
+2. 在对话框执行：`/plugin marketplace add <仓库绝对路径>`
+   （该目录含 `.codebuddy-plugin/marketplace.json`，`source` 指向 `./mindweave.plugin`）
+3. 执行：`/plugin install mindweave@mindweave-local-market`
+4. 必要时执行：`/reload-plugins`
+
+#### Tier 2 — Trae / OpenCode（原生目录同步）
 
 ```powershell
 # Windows
@@ -66,26 +97,8 @@ Rules 约束层 (mindweave.plugin/AGENTS.md — 统一规则源)
 bash scripts/sync-agent-configs.sh
 ```
 
-### 配置 Agent Runtime
-
-##### Trae
-
-1. 用 Trae 打开项目文件夹
-2. 进入 **设置 → MCP**，打开 **"启用项目级 MCP"** 开关
-3. 进入 **设置 → 规则**，开启 **"将 AGENTS.md 包含在上下文中"**
-4. 重启 Trae
-
-> 💡 项目级 MCP 配置已内置于 `.trae/mcp.json`（由 `mindweave.plugin/runtime/trae.json` 经 `scripts/sync-agent-configs` 同步生成），使用 `${workspaceFolder}` 变量自动适配路径。
-
-##### CodeBuddy / OpenCode
-
-1. 运行同步脚本生成 `.codebuddy/` / `.opencode/` 投影
-2. 用 CodeBuddy / OpenCode 打开项目文件夹，信任 mindweave-mcp
-
-##### Goose（AAIF 标准验证 harness）
-
-1. 运行同步脚本生成 `.goose/config.yaml`（`extensions` schema，`--directory` 解析为绝对路径）
-2. 用 Goose 打开项目文件夹，自动读取 `.goose/config.yaml` 加载 mindweave-mcp
+- **Trae**：同步生成 `.trae/`（含 `mcp.json`、`skills/`、`AGENTS.md`）。用 Trae 打开项目文件夹 → 设置 → MCP → 启用「项目级 MCP」；设置 → 规则 → 开启「将 AGENTS.md 包含在上下文中」；重启 Trae。
+- **OpenCode**：同步生成 `.opencode/`（含 `opencode.json`、`skills/`、`AGENTS.md`）。在项目目录运行 `opencode`，`AGENTS.md` 自动加载。
 
 ### 开始使用
 
@@ -114,21 +127,24 @@ cd mindweave.plugin/mindweave-mcp && uv run mindweave-web
 MindWeave/
 ├── AGENTS.md                             # 仓库级说明（规则层，与 mindweave.plugin/AGENTS.md 同步）
 ├── package.json                          # agents publish 入口
-├── scripts/                              # sync-agent-configs(.ps1/.sh) + generate-aaif-declarations.py + pre-commit
+├── marketplace.json                      # VS Code / Copilot 远程市场清单（source → ./mindweave.plugin）
+├── .codebuddy-plugin/marketplace.json    # CodeBuddy 本地插件市场清单
+├── scripts/                              # sync-agent-configs(.ps1/.sh) + generate-aaif-declarations.py + check_version.py + pre-commit
 ├── README.md / CHANGELOG.md / LICENSE
 ├── mindweave.plugin/                     # Agent Plugin 根目录（单一配置与打包真相源）
 │   ├── plugin.json / mcp.json            # Agent Plugins 1.0 manifest + MCP 启动配置
+│   ├── .codebuddy-plugin/plugin.json     # CodeBuddy 插件身份（mcpServers → ./.mcp.json）
+│   ├── .mcp.json                         # CodeBuddy 可移植 MCP 启动配置
 │   ├── AGENTS.md                         # 统一规则源（只改这里）
 │   ├── tools.json / triggers.json / workflows.json   # AAIF 声明（脚本生成，勿手改）
-│   ├── .codebuddy-plugin/plugin.json     # CodeBuddy CLI 插件身份
-│   ├── runtime/{trae,codebuddy,opencode,goose}.json  # 各平台 MCP 运行时配置源
-│   ├── skills/                           # 5 个 Skill（同步到 .trae/.opencode/.codebuddy/.goose）
+│   ├── runtime/{trae,opencode}.json      # Tier 2 各平台 MCP 运行时配置源
+│   ├── skills/                           # 5 个 Skill（同步到 .trae/.opencode）
 │   └── mindweave-mcp/                    # MCP Server 服务层（Python，内联自包含）
 │       ├── src/mindweave_mcp/            # server.py / models.py / algorithms.py / storage.py / prompts/ / tools/ / web/
 │       ├── tests/                        # 测试套件
 │       ├── data/                         # 运行时数据（被 .gitignore，保留 .gitkeep）
 │       └── pyproject.toml                # 入口 mindweave-mcp / mindweave-web
-├── .trae/ .opencode/ .codebuddy/ .goose/ # 各平台配置（scripts/sync-agent-configs 生成）
+├── .trae/ .opencode/                     # Tier 2 各平台配置（scripts/sync-agent-configs 生成）
 └── docs/                                 # 设计文档 / 计划 / 评审（本地文档，不入库追踪）
 ```
 
@@ -139,7 +155,7 @@ MindWeave/
 | 层级 | 位置 | 用途 |
 |------|------|------|
 | **服务层** | `mindweave.plugin/mindweave-mcp/` | 纯 Python MCP Server，通用，不绑定任何客户端，可独立发布；内联于插件目录，使插件完全自包含 |
-| **配置层** | `mindweave.plugin/` | AAIF 唯一真相源，定义 Skills 流程与约束（单一真相源），同步生成 `.trae/` 等各平台目录 |
+| **配置层** | `mindweave.plugin/` | 配置层唯一真相源，定义 Skills 流程与约束（单一真相源），同步生成 `.trae/` / `.opencode/` 各平台目录 |
 | **规则层** | `mindweave.plugin/AGENTS.md` | 业务规则（采集/复习/交互/数据安全）+ 开发规范 |
 
 `mindweave.plugin/AGENTS.md` 是各运行时共用的统一规则源，保证行为一致。修改配置的正确流程：改 `mindweave.plugin/` → 跑 `scripts/sync-agent-configs.ps1`（或 `.sh`）→ 各生成目录改动一起提交（详见 AGENTS.md「流程规则 > 配置同步」）。
@@ -170,6 +186,9 @@ uv run mypy src
 
 # 重新生成 AAIF 声明（tools/triggers/workflows.json）
 uv run --no-sync --directory mindweave.plugin/mindweave-mcp python ../../scripts/generate-aaif-declarations.py
+
+# 版本一致性校验（真相源 pyproject.toml 与各清单/CHANGELOG）
+python scripts/check_version.py
 ```
 
 ## License

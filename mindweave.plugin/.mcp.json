@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mindweave-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${CODEBUDDY_PLUGIN_ROOT}/mindweave-mcp",
+        "mindweave-mcp"
+      ]
+    }
+  }
+}

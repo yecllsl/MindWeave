@@ -1,7 +1,7 @@
 {
   "$schema": "https://agents.aaif.io/schemas/tools.json",
   "name": "mindweave-mcp",
-  "version": "0.2.0",
+  "version": "0.3.2",
   "description": "K12 康奈尔 AI 智能笔记 MCP Server",
   "tools": [
     {

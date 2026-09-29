@@ -1,8 +1,19 @@
 {
   "name": "mindweave",
-  "version": "0.1.0",
-  "description": "MindWeave K12 康奈尔 AI 智能笔记 Agent Plugin：本地优先、基于 SM-2 遗忘曲线的康奈尔笔记系统（拍照/文本采集 → 康奈尔整理 → 复习排程 → 自评 → 统计导出）。",
-  "author": { "name": "yecll" },
+  "version": "0.3.2",
+  "description": "MindWeave K12 康奈尔 AI 智能笔记 Agent Plugin（拍照/文字录入 → 康奈尔整理 → SM-2 复习排程 → 自评 → 统计导出）。",
+  "author": {
+    "name": "yecll"
+  },
   "license": "MIT",
-  "keywords": ["k12", "note", "cornell", "mcp", "agent-plugin", "aaif", "sm-2"]
+  "mcpServers": "./.mcp.json",
+  "keywords": [
+    "k12",
+    "cornell",
+    "note",
+    "mcp",
+    "agent-plugin",
+    "agent-plugins-1.0",
+    "sm-2"
+  ]
 }

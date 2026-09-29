@@ -1,6 +1,6 @@
 {
   "name": "mindweave",
-  "version": "0.2.0",
+  "version": "0.3.2",
   "description": "MindWeave - K12 康奈尔 AI 智能笔记智能体",
   "main": "mindweave.plugin/tools.json",
   "scripts": {
