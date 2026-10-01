@@ -1,7 +1,7 @@
 """MindWeave MCP Server 入口（13 个工具）。"""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastmcp import FastMCP
 
@@ -71,8 +71,8 @@ def export_data(format: str = "json", filters: dict[str, Any] | None = None) -> 
 
 
 @mcp.tool()
-def generate_quiz(cue_id: str, quiz_type: str = "") -> dict[str, Any]:
-    """为 cue 渲染命题 prompt 并生成占位 quiz 落盘（宿主 LLM 生成后经 save_quiz 回写）。"""
+def generate_quiz(cue_id: str, quiz_type: Literal["", "选择", "填空"] = "") -> dict[str, Any]:
+    """为 cue 渲染命题 prompt 并生成占位 quiz 落盘（quiz_type 用中文枚举；空串默认"选择"）。"""
     return quiz.generate_quiz(cue_id, quiz_type)
 
 

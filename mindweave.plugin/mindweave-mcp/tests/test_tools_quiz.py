@@ -205,3 +205,18 @@ def test_grade_marks_quiz_answered(isolated_storage):
     grade_quiz(qid, response="叶绿体")
     quiz = get_storage().load_quiz(qid)
     assert quiz.answered is True and quiz.grade == 4
+
+
+def test_generate_quiz_ids_unique_under_concurrency(isolated_storage):
+    """并发出题不得撞号覆盖（同 vocabcraft 实测到的 ID 竞态成因）"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    _save_note()
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(
+            lambda _: generate_quiz("note_20260830_001_c1", "选择"), range(6)
+        ))
+
+    quiz_ids = [r["quiz_id"] for r in results]
+    assert len(set(quiz_ids)) == len(quiz_ids), f"撞号: {quiz_ids}"
+    assert len(get_storage().list_all_quiz_ids()) == len(quiz_ids)

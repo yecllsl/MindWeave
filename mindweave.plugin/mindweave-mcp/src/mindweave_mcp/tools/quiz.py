@@ -18,7 +18,7 @@ from mindweave_mcp.prompts.quiz_generate_prompt import (
     SELECT_GENERATE_PROMPT,
 )
 from mindweave_mcp.prompts.quiz_grade_prompt import GRADE_PROMPT
-from mindweave_mcp.tools.crud import _generate_id, get_storage
+from mindweave_mcp.tools.crud import ID_LOCK, _generate_id, get_storage
 from mindweave_mcp.tools.review import apply_review
 
 # 占位题干文本：generate 后未 save_quiz 回写的可见标记
@@ -46,6 +46,11 @@ def generate_quiz(cue_id: str, quiz_type: str = "") -> dict[str, Any]:
     """为 cue 渲染命题 prompt，同时生成占位 Quiz 落盘（answer 空、question 占位）。
 
     宿主 LLM 按 generate_prompt 生成题干/选项/答案后，调 save_quiz 回写。
+
+    Args:
+        cue_id: 线索卡 ID
+        quiz_type: 题型，仅两个**中文**枚举 "选择" / "填空"（写成 choice/fill 会被拒绝）；
+            空串默认 "选择"
     """
     storage = get_storage()
     note, cue = _find_note_with_cue(storage, cue_id)
@@ -75,12 +80,13 @@ def generate_quiz(cue_id: str, quiz_type: str = "") -> dict[str, Any]:
     else:
         return {"error": f"quiz_type 须为 选择/填空，收到: {quiz_type}"}
 
-    quiz = QuizRecord(
-        quiz_id=_generate_quiz_id(storage), note_id=note.note_id, cue_id=cue_id,
-        quiz_type=qtype, question=_PLACEHOLDER_QUESTION, options=[], answer="",
-        created_at=_now_iso(),
-    )
-    storage.save_quiz(quiz)
+    with ID_LOCK:
+        quiz = QuizRecord(
+            quiz_id=_generate_quiz_id(storage), note_id=note.note_id, cue_id=cue_id,
+            quiz_type=qtype, question=_PLACEHOLDER_QUESTION, options=[], answer="",
+            created_at=_now_iso(),
+        )
+        storage.save_quiz(quiz)
     return {
         "quiz_id": quiz.quiz_id, "quiz": quiz.model_dump(), "generate_prompt": prompt,
         "message": "请使用 generate_prompt 调用 LLM 生成题目，再调用 save_quiz 回写",

@@ -1,6 +1,7 @@
 """笔记 CRUD Tools：save/get/query/update/delete。"""
 from __future__ import annotations
 
+import threading
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,13 @@ from mindweave_mcp.storage import Storage
 
 # 数据目录唯一真相源：export / organize / 测试隔离 fixture 均引用此处
 _DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
+
+# 创建路径的「扫描已有 ID → 生成新 ID → 写盘」必须整体串行：同一轮对话里模型会并行
+# 发多个保存/出题调用，各自读到同一份 ID 列表、算出同一个 ID，后写者被拒或覆盖先写者。
+ID_LOCK = threading.Lock()
+
+# query_notes 白名单：未知键必须报错而不是静默忽略（静默忽略会把键名写错变成「查无此笔记」）
+_SUPPORTED_FILTERS = {"subject", "knowledge_point", "keyword", "date_range"}
 
 
 def get_storage() -> Storage:
@@ -54,26 +62,30 @@ def save_note(note_data: dict[str, Any]) -> dict[str, Any]:
     raw_cues = cornell_raw.get("cues") or []
     if not raw_cues:
         return {"error": "cornell.cues 至少 1 条"}
-    note_id = _generate_note_id(storage) if not note_data.get("note_id") else note_data["note_id"]
-    now = _now_utc().isoformat()
-    try:
-        note = NoteRecord(
-            note_id=note_id,
-            created_at=note_data.get("created_at", now),
-            updated_at=note_data.get("updated_at", now),
-            subject=subject,
-            knowledge_points=note_data.get("knowledge_points", []),
-            cornell=Cornell(
-                body=cornell_raw.get("body", ""),
-                summary=cornell_raw.get("summary", ""),
-                cues=_init_cues(note_id, raw_cues),
-            ),
-            source=note_data.get("source", {}),
+    # ID 分配 → 校验 → 写盘：同一临界区内完成，并发调用不会撞号（撞号会被拒存）
+    with ID_LOCK:
+        note_id = (
+            _generate_note_id(storage) if not note_data.get("note_id") else note_data["note_id"]
         )
-    except (ValueError, TypeError) as exc:
-        # MCP 工具须吞掉校验异常返回 {error}，避免工具调用直接崩溃
-        return {"error": f"保存失败: {exc}"}
-    return storage.save_note(note)
+        now = _now_utc().isoformat()
+        try:
+            note = NoteRecord(
+                note_id=note_id,
+                created_at=note_data.get("created_at", now),
+                updated_at=note_data.get("updated_at", now),
+                subject=subject,
+                knowledge_points=note_data.get("knowledge_points", []),
+                cornell=Cornell(
+                    body=cornell_raw.get("body", ""),
+                    summary=cornell_raw.get("summary", ""),
+                    cues=_init_cues(note_id, raw_cues),
+                ),
+                source=note_data.get("source", {}),
+            )
+        except (ValueError, TypeError) as exc:
+            # MCP 工具须吞掉校验异常返回 {error}，避免工具调用直接崩溃
+            return {"error": f"保存失败: {exc}"}
+        return storage.save_note(note)
 
 
 def get_note(note_id: str) -> dict[str, Any]:
@@ -83,7 +95,16 @@ def get_note(note_id: str) -> dict[str, Any]:
 
 
 def query_notes(filters: dict[str, Any]) -> dict[str, Any]:
-    """按学科/知识点/关键词/日期区间过滤笔记，created_at 倒序。"""
+    """按学科/知识点/关键词/日期区间过滤笔记，created_at 倒序。
+
+    仅支持 subject / knowledge_point / keyword / date_range 四个键；
+    未知键返回 error（静默忽略会把「键名写错」变成「查无此笔记」）。
+    """
+    unknown = set((filters or {}).keys()) - _SUPPORTED_FILTERS
+    if unknown:
+        return {
+            "error": f"不支持的过滤键: {sorted(unknown)}；支持: {sorted(_SUPPORTED_FILTERS)}",
+        }
     storage = get_storage()
     notes: list[dict[str, Any]] = []
     for n in storage.get_all_notes():

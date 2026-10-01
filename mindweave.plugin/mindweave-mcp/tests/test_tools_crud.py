@@ -133,3 +133,24 @@ def test_generate_id_generic_prefix(isolated_storage):
     stamp = _now_utc().strftime("%Y%m%d")
     assert _generate_id("quiz", []) == f"quiz_{stamp}_001"
     assert _generate_id("quiz", [f"quiz_{stamp}_001"]) == f"quiz_{stamp}_002"
+
+
+def test_save_note_ids_unique_under_concurrency(isolated_storage):
+    """并发建笔记不得撞号（撞号会被 save_note 的防覆盖拒绝，等于丢笔记）"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(lambda _: save_note(_note_data(subject="数学")), range(6)))
+
+    assert all("note_id" in r for r in results), f"有保存失败: {results}"
+    note_ids = [r["note_id"] for r in results]
+    assert len(set(note_ids)) == len(note_ids), f"撞号: {note_ids}"
+    assert len(get_storage().list_all_note_ids()) == len(note_ids)
+
+
+def test_query_notes_rejects_unknown_filter_key(isolated_storage):
+    """未知过滤键必须报错，不能被静默忽略成「查无此笔记」"""
+    save_note(_note_data())
+
+    assert "error" in query_notes({"note_ids": ["note_1"]})
+    assert query_notes({"subject": "语文"})["total_count"] == 1

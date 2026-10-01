@@ -18,3 +18,11 @@ def test_registered_tool_end_to_end_call():
     # 用 organize_note()（无参 → dialog 模式）验证——不触碰数据目录，无副作用。
     r = server.organize_note()
     assert r["mode"] == "dialog" and "parse_prompt" in r
+
+
+def test_generate_quiz_quiz_type_is_enum():
+    """quiz_type 在 MCP 层必须是枚举，否则模型会猜 choice/fill（实测回归：连拒 5 次）"""
+    from typing import Literal, get_type_hints
+
+    hints = get_type_hints(server.generate_quiz)
+    assert hints["quiz_type"] == Literal["", "选择", "填空"]
